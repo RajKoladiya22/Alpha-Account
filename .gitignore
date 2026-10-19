@@ -1,30 +1,107 @@
-# dependencies
-/node_modules
+# ==========================================
+# Dependencies
+# ==========================================
+node_modules/
 /.pnp
 .pnp.js
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
 
-# testing
-/coverage
+# ==========================================
+# Next.js & Production Builds
+# ==========================================
+.next/
+out/
+build/
+dist/
 
-# next.js
-/.next/
-/out/
+# ==========================================
+# Environment Variables & Secrets
+# ==========================================
+.env
+.env*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# production
-/build
+# ==========================================
+# Testing & Code Coverage
+# ==========================================
+coverage/
+.nyc_output/
+*.lcov
 
-# misc
-.DS_Store
-*.pem
-
-# debug
+# ==========================================
+# Debugging & Runtime Logs
+# ==========================================
+*.log
+logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# local env files
-.env*.local
+# ==========================================
+# Operating System Files
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
 
-# typescript
+# ==========================================
+# IDE & Code Editors
+# ==========================================
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.sublime-workspace
+*.sublime-project
+*.swp
+*.swo
+*~
+
+# ==========================================
+# TypeScript & Cache
+# ==========================================
 *.tsbuildinfo
 next-env.d.ts
+
+# ==========================================
+# Databases & Local SQLite / Dump files
+# ==========================================
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.db
+*.db-journal
+*.dump
+*.sql.gz
+
+# ==========================================
+# Temporary Files & Archives
+# ==========================================
+tmp/
+temp/
+*.tmp
+*.bak
+*.pem
+*.key
+*.cert
+
+# ==========================================
+# Hosting & Vercel
+# ==========================================
+.vercel/
