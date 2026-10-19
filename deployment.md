@@ -119,13 +119,14 @@ JWT_SECRET="64_CHARACTER_RANDOM_HEX_SECRET_STRING_HERE"
    ```bash
    npm install --omit=dev
    ```
-5. Generate the Prisma MySQL client:
-   ```bash
-   npx prisma generate
-   ```
-6. Build the Next.js production bundle:
+5. Push Database Schema & Build Production Assets:
+   `npm run build` automatically triggers `prisma generate`, synchronizes tables via `prisma db push`, and builds Next.js assets:
    ```bash
    npm run build
+   ```
+   *(Optional)* To manually sync or update database schema at any time:
+   ```bash
+   npm run db:push
    ```
 
 ---
