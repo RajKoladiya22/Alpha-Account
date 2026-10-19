@@ -12,8 +12,6 @@ export interface QuoteListProps {
   onSearchChange: (query: string) => void;
   onClickNewQuote: () => void;
   onClickQuoteRow: (quoteId: string) => void;
-  onCopyToInvoice?: (quoteId: string) => void;
-  onDeleteQuote?: (quoteId: string) => void;
 }
 
 export const QuoteList: React.FC<QuoteListProps> = ({
@@ -25,11 +23,7 @@ export const QuoteList: React.FC<QuoteListProps> = ({
   onSearchChange,
   onClickNewQuote,
   onClickQuoteRow,
-  onCopyToInvoice,
-  onDeleteQuote,
 }) => {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
   const tabs = [
     { key: "ALL", label: "All" },
     { key: "DRAFT", label: "Draft" },
@@ -39,36 +33,17 @@ export const QuoteList: React.FC<QuoteListProps> = ({
     { key: "CONVERTED_TO_INVOICE", label: "Invoiced" },
   ];
 
-  const handleToggleSelectAll = () => {
-    if (selectedIds.size === quotes.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(quotes.map((q) => q.id)));
-    }
-  };
-
-  const handleToggleRow = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const next = new Set(selectedIds);
-    if (next.has(id)) {
-      next.delete(id);
-    } else {
-      next.add(id);
-    }
-    setSelectedIds(next);
-  };
-
-  const getStatusBadge = (status: QuoteStatus) => {
+  const getStatusBadge = (status: QuoteStatus | string) => {
     switch (status) {
       case "DRAFT":
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300">
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-700">
             Draft
           </span>
         );
       case "SENT":
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-700 border border-gray-300">
             Sent
           </span>
         );
@@ -79,9 +54,10 @@ export const QuoteList: React.FC<QuoteListProps> = ({
           </span>
         );
       case "DECLINED":
+      case "DELETED":
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-            Declined
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#fde8e8] text-[#9b1c1c]">
+            Deleted
           </span>
         );
       case "CONVERTED_TO_INVOICE":
@@ -91,207 +67,183 @@ export const QuoteList: React.FC<QuoteListProps> = ({
           </span>
         );
       default:
-        return <span>{status}</span>;
+        return <span className="text-xs text-gray-600">{status}</span>;
     }
   };
 
-  const formatDate = (d: Date | string) => {
+  const formatDate = (d: Date | string | undefined) => {
+    if (!d) return "";
     const date = new Date(d);
-    return date.toLocaleDateString("en-AU", {
-      day: "numeric",
+    return date.toLocaleDateString("en-US", {
       month: "short",
+      day: "numeric",
       year: "numeric",
     });
   };
 
-  const isExpired = (expiryDate: Date | string, status: QuoteStatus) => {
-    const exp = new Date(expiryDate).getTime();
-    const now = Date.now();
-    return exp < now && status === "SENT";
-  };
-
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 py-6 font-sans">
-      {/* Top Header & Breadcrumb */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 pb-2 border-b border-gray-200">
+    <div className="w-full max-w-7xl mx-auto px-4 py-5 font-sans">
+      {/* Top Breadcrumb & Heading matching image.png */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2">
         <div>
-          <nav className="text-xs text-gray-500 mb-1">
-            <span>Business</span> &gt; <span className="text-gray-800 font-medium">Quotes</span>
-          </nav>
-          <h1 className="text-2xl font-bold text-gray-900">Quotes</h1>
+          <div className="text-xs text-[#006fe6] hover:underline cursor-pointer flex items-center mb-1">
+            <span>Sales overview</span>
+            <svg className="w-3.5 h-3.5 ml-0.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-bold text-gray-900 tracking-tight">Quotes</h1>
         </div>
 
-        <div className="mt-3 sm:mt-0 flex items-center space-x-3">
+        <div className="mt-3 sm:mt-0 flex items-center space-x-2">
           <button
             onClick={onClickNewQuote}
-            className="inline-flex items-center px-4 py-2 bg-[#006fe6] hover:bg-[#005bb5] text-white text-sm font-semibold rounded shadow-sm transition"
+            className="inline-flex items-center px-3.5 py-1.5 bg-[#13893a] hover:bg-[#0f6f2e] text-white text-sm font-semibold rounded shadow-sm transition"
           >
             New quote
+          </button>
+          <button className="p-1.5 text-gray-500 hover:text-gray-700 rounded hover:bg-gray-100">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+            </svg>
           </button>
         </div>
       </div>
 
       {/* Status Tabs Bar */}
-      <div className="flex border-b border-gray-200 space-x-6 mb-4 overflow-x-auto text-sm">
+      <div className="flex border-b border-gray-200 space-x-8 mb-4 overflow-x-auto text-sm">
         {tabs.map((tab) => {
           const isActive = activeStatusTab === tab.key;
-          const count = counts[tab.key] || 0;
+          const count = counts[tab.key] !== undefined ? counts[tab.key] : 0;
           return (
             <button
               key={tab.key}
               onClick={() => onSelectStatusTab(tab.key)}
-              className={`pb-3 whitespace-nowrap font-medium transition border-b-2 flex items-center space-x-1.5 ${
+              className={`pb-2.5 whitespace-nowrap text-sm font-medium transition flex items-center space-x-1.5 border-b-2 ${
                 isActive
                   ? "border-[#006fe6] text-[#006fe6] font-semibold"
-                  : "border-transparent text-gray-500 hover:text-gray-800"
+                  : "border-transparent text-gray-600 hover:text-gray-900"
               }`}
             >
               <span>{tab.label}</span>
-              <span
-                className={`text-xs px-1.5 py-0.2 rounded-full ${
-                  isActive ? "bg-blue-100 text-[#006fe6]" : "bg-gray-100 text-gray-600"
-                }`}
-              >
-                {count}
-              </span>
+              {tab.key !== "ALL" && (
+                <span className="text-gray-500 font-normal">{count}</span>
+              )}
             </button>
           );
         })}
       </div>
 
-      {/* Search & Filter Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
-        <div className="relative flex-1 max-w-md">
+      {/* Search & Filter Toolbar Card matching image.png */}
+      <div className="bg-[#f0f3f6] rounded px-3 py-2 mb-3 flex items-center justify-between">
+        <div className="flex items-center space-x-2 flex-1">
+          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search quotes by number, customer, or reference..."
-            className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-[#006fe6] focus:ring-1 focus:ring-[#006fe6]"
+            placeholder="Enter a contact, amount, reference or quote number"
+            className="w-full bg-transparent text-sm text-gray-800 placeholder-gray-500 focus:outline-none"
           />
-          <svg
-            className="w-4 h-4 text-gray-400 absolute left-3 top-2.5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
         </div>
 
-        <button className="inline-flex items-center px-3 py-1.5 border border-gray-300 bg-white hover:bg-gray-50 text-sm font-medium text-gray-700 rounded shadow-sm">
-          <svg className="w-4 h-4 mr-1.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+        <button className="flex items-center text-sm font-medium text-[#006fe6] hover:text-[#005bb5] px-2 py-1">
+          <svg className="w-4 h-4 mr-1 text-[#006fe6]" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
           </svg>
           Filter
         </button>
       </div>
 
-      {/* Quotes Table */}
-      <div className="bg-white border border-gray-200 rounded shadow-sm overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200 text-left text-sm">
-          <thead className="bg-[#f9fafb] text-gray-600 font-semibold text-xs uppercase tracking-wider">
-            <tr>
-              <th className="w-10 px-4 py-3">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.size > 0 && selectedIds.size === quotes.length}
-                  onChange={handleToggleSelectAll}
-                  className="rounded border-gray-300 text-[#006fe6] focus:ring-[#006fe6]"
-                />
+      {/* Item count text */}
+      <div className="text-xs text-gray-500 mb-2 font-medium">
+        {quotes.length} items
+      </div>
+
+      {/* Quotes Table matching image.png */}
+      <div className="bg-white border border-gray-200 rounded shadow-sm overflow-x-auto">
+        <table className="w-full text-left text-sm border-collapse">
+          <thead>
+            <tr className="border-b border-gray-200 text-xs text-gray-500 bg-white">
+              <th className="px-4 py-2.5 font-normal">Number</th>
+              <th className="px-4 py-2.5 font-normal">Reference</th>
+              <th className="px-4 py-2.5 font-normal">Customer</th>
+              <th className="px-4 py-2.5 font-normal flex items-center">
+                Issue date <span className="ml-1 text-gray-400">↓</span>
               </th>
-              <th className="px-4 py-3">Number</th>
-              <th className="px-4 py-3">Reference</th>
-              <th className="px-4 py-3">Customer</th>
-              <th className="px-4 py-3">Issue Date</th>
-              <th className="px-4 py-3">Expiration Date</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3 text-right">Amount ({quotes[0]?.currency || "AUD"})</th>
-              <th className="w-12 px-2 py-3 text-center"></th>
+              <th className="px-4 py-2.5 font-normal">Expiration date</th>
+              <th className="px-4 py-2.5 font-normal">Status</th>
+              <th className="px-4 py-2.5 font-normal text-right">Amount</th>
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-gray-200 bg-white">
+          <tbody className="divide-y divide-gray-100">
             {quotes.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
-                  No quotes found for the selected tab or search query.
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                  No quotes found.
                 </td>
               </tr>
             ) : (
               quotes.map((quote) => {
-                const expired = isExpired(quote.expiryDate, quote.status);
-                const isSelected = selectedIds.has(quote.id);
+                const isOverdue =
+                  quote.status === "SENT" &&
+                  new Date(quote.expiryDate).getTime() < Date.now();
 
                 return (
                   <tr
                     key={quote.id}
                     onClick={() => onClickQuoteRow(quote.id)}
-                    className={`hover:bg-[#f3f7fd] cursor-pointer transition ${
-                      isSelected ? "bg-blue-50/50" : ""
-                    }`}
+                    className="hover:bg-[#f9fafb] cursor-pointer transition"
                   >
-                    <td className="px-4 py-3" onClick={(e) => handleToggleRow(quote.id, e)}>
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => {}}
-                        className="rounded border-gray-300 text-[#006fe6] focus:ring-[#006fe6]"
-                      />
-                    </td>
-
-                    <td className="px-4 py-3 font-semibold text-[#006fe6] hover:underline">
+                    <td className="px-4 py-3 font-medium text-[#006fe6] underline whitespace-nowrap">
                       {quote.quoteNumber}
                     </td>
 
-                    <td className="px-4 py-3 text-gray-600 truncate max-w-[150px]">
+                    <td className="px-4 py-3 text-gray-700 text-xs">
                       {quote.reference || "—"}
                     </td>
 
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      {quote.contactId}
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-gray-900 text-xs">
+                        {quote.contactName}
+                      </div>
                     </td>
 
-                    <td className="px-4 py-3 text-gray-600">
+                    <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">
                       {formatDate(quote.date)}
                     </td>
 
-                    <td className="px-4 py-3 text-gray-600 flex items-center space-x-1">
-                      {expired && (
-                        <span
-                          className="text-red-600 inline-flex items-center"
-                          title="Quote is expired"
+                    <td className="px-4 py-3 text-xs whitespace-nowrap">
+                      {quote.expiryDate ? (
+                        <div
+                          className={`flex items-center space-x-1 ${
+                            isOverdue ? "text-[#d32f2f] font-medium" : "text-gray-600"
+                          }`}
                         >
-                          <svg className="w-4 h-4 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                          </svg>
-                        </span>
+                          {isOverdue && (
+                            <svg className="w-3.5 h-3.5 text-[#d32f2f] mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          )}
+                          <span>{formatDate(quote.expiryDate)}</span>
+                        </div>
+                      ) : (
+                        "—"
                       )}
-                      <span className={expired ? "text-red-600 font-medium" : ""}>
-                        {formatDate(quote.expiryDate)}
-                      </span>
                     </td>
 
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       {getStatusBadge(quote.status)}
                     </td>
 
-                    <td className="px-4 py-3 text-right font-medium text-gray-900">
-                      {quote.totalAmount.toLocaleString("en-AU", {
+                    <td className="px-4 py-3 text-right font-medium text-gray-900 text-xs whitespace-nowrap">
+                      {Number(quote.totalAmount).toLocaleString("en-AU", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
-                    </td>
-
-                    <td className="px-2 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        className="text-gray-400 hover:text-gray-700 p-1 rounded"
-                        title="Actions"
-                      >
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
-                        </svg>
-                      </button>
                     </td>
                   </tr>
                 );
@@ -299,6 +251,11 @@ export const QuoteList: React.FC<QuoteListProps> = ({
             )}
           </tbody>
         </table>
+
+        {/* Footer info */}
+        <div className="p-3 text-xs text-gray-500 border-t border-gray-100 bg-[#fbfbfb]">
+          Showing items 1–{quotes.length} of {quotes.length}
+        </div>
       </div>
     </div>
   );

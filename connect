@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -e
+
+if [ "$1" = "db" ] || [ "$1" = "" ]; then
+  echo "==> Connecting and syncing database via Prisma..."
+  npx prisma db push
+  echo "==> Seeding database with screenshot reference data..."
+  node --experimental-strip-types prisma/seed.ts
+  echo "==> Database successfully connected, synced, and seeded!"
+else
+  echo "Usage: connect db"
+  exit 1
+fi

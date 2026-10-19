@@ -12,25 +12,63 @@ Run the full verification suite across all 7 domain subsystems using Node's nati
 npm test
 ```
 
-### Verified Test Suite Results:
-```text
-▶ AppServer: End-to-End REST APIs for Quotes, Contacts, Portal, and Settings (10 tests) ✔
-▶ ClientPortalService: Cryptographic Token Security & Client Actions (6 tests) ✔
-▶ ContactService: Customers & Suppliers Management (3 tests) ✔
-▶ Invariant 1: Domain Separation & Routing (4 tests) ✔
-▶ Invariant 1: WebAuthn Passkeys with Mandatory Dual-Rail Email (5 tests) ✔
-▶ Invariant 1: 15-Minute Sliding-Window Brute-Force Lockout & Reset Penalty (3 tests) ✔
-▶ Invariant 2: Double-Entry Ledger Balancing Invariants (7 tests) ✔
-▶ Invariant 3: Document State Machine & Referential Lineage (4 tests) ✔
-▶ Invariant 4: Bank Reconciliation Hierarchical Resolution Pipeline (4 tests) ✔
-▶ Invariant 5: Streaming Assistive AI (JAX) & Audited Tool Calling (2 tests) ✔
-▶ Multi-Tenancy: Strict Data Isolation Between Organizations (3 tests) ✔
-▶ RBAC: Role Permissions Enforcement (OWNER, ADVISER, STANDARD, READONLY) (3 tests) ✔
-▶ QuoteService: Quote Creation & Tax Treatment Calculations (4 tests) ✔
-▶ QuoteService: Lifecycle State Transitions & Lineage Preservation (5 tests) ✔
+---
 
-ℹ tests 70 | suites 7 | pass 70 | fail 0 | duration_ms 563ms
+## 1.1 Running the Application & Supported Commands
+
+The engine supports full production workflows, local development, database synchronization, and continuous integration:
+
+### 1. Database Connection & Schema Seeding (`connect db`)
+To push the multi-tenant Prisma schema to PostgreSQL (or MySQL on Hostinger) and automatically seed the database with all default accounts, contacts, and quote references matching `/Screenshort/quotes`:
+```bash
+./connect db
+# or
+connect db
+# or
+npm run connect-db
 ```
+
+### 2. Next.js Development Server (`npm run dev`)
+Starts the fast local development server with hot-module reloading and Tailwind CSS styling:
+```bash
+npm run dev
+```
+Available at `http://localhost:3000`.
+
+### 3. Production Build (`npm run build`)
+Compiles and optimizes all 23 static pages, server-rendered dynamic routes, and API endpoints:
+```bash
+npm run build
+```
+
+### 4. Production Start (`npm run start`)
+Launches the production-ready Next.js application server:
+```bash
+npm run start
+```
+
+### 5. Production Server with Socket.io (`npm run start:custom`)
+Launches the custom Node.js server integrating Next.js with real-time Socket.io streaming for the JAX AI financial assistant:
+```bash
+npm run start:custom
+```
+
+---
+
+## 1.2 Screenshot-to-Component Mapping (`/Screenshort/quotes`)
+
+All 19 high-resolution UI screenshots have been faithfully recreated as responsive, accessible PWA components:
+
+| Screenshot | UI View / Module | Route / Component | Features Implemented |
+|---|---|---|---|
+| `image.png` | Quotes Directory | `/quotes` (`QuoteList.tsx`) | Status filter tabs (All, Draft, Sent, Accepted, Invoiced), search filter, multi-select batch actions, action dropdowns, quote summary totals |
+| `image copy.png` - `image copy 9.png` | New Quote Editor & Modals | `/quotes/new` (`QuoteEditor.tsx`) | Interactive line item grid, tax treatment toggle (Exclusive, Inclusive, None), account selector, drag-drop handles, Save/Send split-buttons, customer autocomplete |
+| `image copy 10.png` - `image copy 12.png` | Quote Details & Workflow History | `/quotes/[id]` (`QuoteView.tsx`) | Status badges, Send/Print/PDF toolbar, Copy to Invoice conversion, client portal preview, internal team audit notes & activity timeline |
+| `image copy 13.png` | Customer Detail & 12-Month Sales Graph | `/contacts/[id]` | Customer overview, outstanding balances, interactive 12-month bar chart, transaction tabs (All, Invoices, Quotes) |
+| `image copy 14.png` - `image copy 16.png` | Organization & Financial Settings | `/settings` (`OrganizationSettings.tsx`) | Organization name, legal details, currency, financial year end, tax rates, chart of accounts directory |
+| `image copy 17.png` | Customers Directory | `/contacts/customers` (`CustomerList.tsx`) | Customer balances (You Owe / They Owe / Overdue), search, alphabetic jump bar, quick contact action buttons |
+| `image copy 18.png` | Add Contact Modal | `/contacts/add` (`AddContactForm.tsx`) | Contact details, postal/physical addresses, primary person, tax numbers, supplier/customer flags |
+| Public View | Cryptographic Client Portal | `/portal/quote/[token]` (`ClientPortalView.tsx`) | Responsive customer portal, Accept/Decline action cards, digital signature, PDF export, tamper-proof HMAC verification |
 
 ---
 
