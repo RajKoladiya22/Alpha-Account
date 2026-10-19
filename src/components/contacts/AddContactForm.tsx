@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import type { CreateContactInput } from "../../core/contacts/contact-service.ts";
 

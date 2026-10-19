@@ -1,96 +1,22 @@
 # Multi-Tenant Financial Accounting & Document Lifecycle Engine
 
-A production-grade, clean-room financial accounting engine designed with strict adherence to enterprise accounting invariants, multi-tenant isolation, WebAuthn passkeys, and real-time streaming conversational AI (JAX).
+A production-grade, clean-room financial accounting and quoting engine designed with strict adherence to enterprise accounting invariants, multi-tenant data isolation, WebAuthn passkeys, Next.js client/server security boundaries, and an integrated **Reverse Engineer Anything (REA)** agent toolchain.
 
 ---
 
-## The 5 Absolute Architectural Invariants
+## 1. Quick Start & Test Suite
 
-### 1. Domain Separation & Security Boundaries
-* **Isolated Subdomains:**
-  * **Public Marketing:** `www.yourdomain.com` (SSG / SSR landing pages, zero operational mutation routes).
-  * **Portal Shell:** `go.yourdomain.com` (Authenticated application shell; unauthenticated requests redirect with `returnUrl` to auth gateway).
-  * **Identity Gateway:** `login.yourdomain.com` (Isolated credential and authentication boundary).
-* **WebAuthn (Passkeys) with Dual-Rail Fallback:**
-  * Mandatory cryptographic WebAuthn credentials backed by biometric and hardware authenticators.
-  * Mandatory dual-rail backup email enforcement.
-* **15-Minute Sliding-Window Lockout with Reset Penalty:**
-  * 5 consecutive failed attempts trigger an immediate 900-second (15-minute) account lock.
-  * Attempting a password reset while the lock is active **resets the countdown timer back to 900 seconds**.
-
-### 2. Double-Entry Ledger Integrity
-* **Strict Balance Constraint:**
-  $$\sum \text{Debits} \equiv \sum \text{Credits}$$
-  Unbalanced journals are rejected with `INVARIANT_VIOLATION`.
-* **Immutable & Append-Only:**
-  * Once posted, journal entries cannot be edited or deleted.
-  * Cancellations occur strictly via `reverseJournalEntry()`, generating an equal and opposite journal linking `reversingJournalId`.
-
-### 3. Document Mutation Lifecycle & Lineage
-* **Deterministic State Machines:**
-  * **Quotes:** `DRAFT` $\rightarrow$ `SENT` $\rightarrow$ `ACCEPTED` / `DECLINED` $\rightarrow$ `CONVERTED_TO_INVOICE`
-  * **Invoices:** `DRAFT` $\rightarrow$ `AUTHORIZED` $\rightarrow$ `PARTIALLY_PAID` $\rightarrow$ `PAID` $\rightarrow$ `VOIDED`
-  * **Purchase Orders:** `DRAFT` $\rightarrow$ `APPROVED` $\rightarrow$ `BILLED`
-* **Referential Lineage:**
-  * Invoices converted from Quotes retain `sourceQuoteId` and line-item unit pricing verbatim.
-  * Bills converted from Purchase Orders retain `sourcePurchaseOrderId`.
-
-### 4. Bank Reconciliation Hierarchical Matching Pipeline
-Incoming bank statement lines are resolved using a 4-step hierarchy:
-1. **Step 1 (Conditional Bank Rules):** Deterministic evaluation of user-defined conditions (`CONTAINS`, `EQUALS`, `REGEX`, amounts).
-2. **Step 2 (Exact Matches):** 1:1 match on amount, sign/polarity, and document reference identifier (`INV-xxxx`, `BILL-xxxx`).
-3. **Step 3 (Heuristic Matches):** Multi-factor scoring ($0.00$ to $1.00$) weighting amount proximity, date window ($\le 7$ days), string similarity, and historical transaction memory.
-4. **Step 4 (Manual Fallback):** Unmatched items are flagged for human split or manual journal creation.
-
-### 5. Hybrid Micro-Frontend & Streaming AI Assistant (JAX)
-* **Decoupled MFEs:** Invoicing, Bills, and Banking modules communicate across an asynchronous `CrossMfeEventBus`.
-* **Streaming JAX Companion:** Operates over a bi-directional streaming channel (SSE / WebSockets). All actions (price lookups, draft invoices, customer emails) execute strictly via audited tool calls recorded in `AuditLog`.
-
----
-
-## Directory Scaffolding
-
-```text
-├── docker/
-│   ├── Dockerfile                 # Multi-stage production container
-│   └── docker-compose.yml         # App + PostgreSQL + Redis orchestration
-├── prisma/
-│   └── schema.prisma              # PostgreSQL / MySQL multi-tenant schema
-├── src/
-│   ├── config/domains.ts          # Subdomain mapping & resolution
-│   ├── core/
-│   │   ├── ai/jax-agent-gateway.ts# Audited JAX AI tool engine & stream generator
-│   │   ├── banking/reconciliation-engine.ts # 4-step hierarchical matcher
-│   │   ├── documents/state-machine.ts       # Quote, Invoice, PO state machines
-│   │   ├── ledger/double-entry-engine.ts    # sum(D) == sum(C) ledger engine
-│   │   └── security/
-│   │       ├── jwt-session.ts     # Hardened __Host- session cookies
-│   │       ├── lockout-manager.ts # 15-min sliding window & reset penalty
-│   │       └── webauthn-manager.ts# Passkeys & dual-rail email fallback
-│   ├── mfe/event-bus.ts           # Decoupled cross-MFE communication bridge
-│   ├── middleware/subdomain-router.ts # Next.js edge routing middleware
-│   ├── server/socket-handler.ts   # WebSocket / Socket.io server adapter
-│   └── types/index.ts             # Domain contracts & invariants
-└── tests/
-    ├── invariant-1-security.test.ts
-    ├── invariant-2-ledger.test.ts
-    ├── invariant-3-documents.test.ts
-    ├── invariant-4-banking.test.ts
-    └── invariant-5-jax-ai.test.ts
-```
-
----
-
-## Running the Automated Invariant Verification Suite
-
-Run the full test suite using Node's native test runner (zero external dependencies required):
+Run the full verification suite across all 7 domain subsystems using Node's native test runner (zero external dependencies required):
 
 ```bash
 npm test
 ```
 
-### Test Suite Execution Output
+### Verified Test Suite Results:
 ```text
+▶ AppServer: End-to-End REST APIs for Quotes, Contacts, Portal, and Settings (10 tests) ✔
+▶ ClientPortalService: Cryptographic Token Security & Client Actions (6 tests) ✔
+▶ ContactService: Customers & Suppliers Management (3 tests) ✔
 ▶ Invariant 1: Domain Separation & Routing (4 tests) ✔
 ▶ Invariant 1: WebAuthn Passkeys with Mandatory Dual-Rail Email (5 tests) ✔
 ▶ Invariant 1: 15-Minute Sliding-Window Brute-Force Lockout & Reset Penalty (3 tests) ✔
@@ -98,39 +24,83 @@ npm test
 ▶ Invariant 3: Document State Machine & Referential Lineage (4 tests) ✔
 ▶ Invariant 4: Bank Reconciliation Hierarchical Resolution Pipeline (4 tests) ✔
 ▶ Invariant 5: Streaming Assistive AI (JAX) & Audited Tool Calling (2 tests) ✔
+▶ Multi-Tenancy: Strict Data Isolation Between Organizations (3 tests) ✔
+▶ RBAC: Role Permissions Enforcement (OWNER, ADVISER, STANDARD, READONLY) (3 tests) ✔
+▶ QuoteService: Quote Creation & Tax Treatment Calculations (4 tests) ✔
+▶ QuoteService: Lifecycle State Transitions & Lineage Preservation (5 tests) ✔
 
-ℹ tests 29
-ℹ suites 7
-ℹ pass 29
-ℹ fail 0
+ℹ tests 70 | suites 7 | pass 70 | fail 0 | duration_ms 563ms
 ```
 
 ---
 
-## Hostinger VPS Deployment Walkthrough
+## 2. Integrated REA Reverse Engineering Toolchain & Team
 
-### 1. Provision Ubuntu VPS & Point DNS Records
-Configure your DNS A-records in Hostinger hPanel to point your server IP to:
-* `yourdomain.com` & `www.yourdomain.com` (Marketing)
-* `go.yourdomain.com` (Portal Shell)
-* `login.yourdomain.com` (Identity Gateway)
+The repository is equipped with the full **REA (Reverse Engineer Anything)** toolchain (`/rea`) and registered skill suite (`/.agents/skills/`), supported by four specialized autonomous agents:
 
-### 2. Launch via Docker Compose
-SSH into your Hostinger VPS and deploy:
+### Autonomous Team Structure
+1. **`rea-reverse-engineer`**: Analyzes shipped applications, web DOMs, network payloads, and decompiled ASTs using REA tools. Distinguishes observations (`[SEEN]`) from structural deductions (`[GUESSED]`).
+2. **`clean-room-architect`**: Formulates clean-room domain specifications, invariants, and database models from observed behaviors without copying proprietary code.
+3. **`security-evaluator`**: Audits authentication gates, sliding-window brute-force lockouts, WebAuthn credentials, and timing-safe token verification.
+4. **`app-feature-builder`**: Builds responsive Next.js PWA components, secure Server Actions, and business domain services with full test coverage.
 
-```bash
-# Clone repository
-git clone <repo-url> /opt/fintech-platform
-cd /opt/fintech-platform/docker
+### Installed REA Skills
+- `reverse-engineer-anything` (`.agents/skills/reverse-engineer-anything`): Full reverse engineering engine across native, managed, Electron/JS, and web targets.
+- `rea-tool-design` (`.agents/skills/rea-tool-design`): Clean-room tool contract specification and design patterns.
+- `rea-analysis-optimization` (`.agents/skills/rea-analysis-optimization`): Token-efficient analysis and context minimization.
+- `rea-ci-tests-audit` (`.agents/skills/rea-ci-tests-audit`): Automated regression testing for reverse engineering workflows.
+- `rea-changelog-update` (`.agents/skills/rea-changelog-update`): Versioning and change documentation.
 
-# Launch PostgreSQL 16, Redis 7, and Node.js App
-docker compose up -d --build
+---
+
+## 3. Next.js Client & Server Security Architecture
+
+This codebase enforces strict isolation between client-side user interface code and server-side execution:
+
+### Client Components (`"use client"`)
+- Files under `src/components/` operate as client interactive components.
+- Handles user interactions, form validation, split-button dropdowns, drag handles, and local state.
+- **Security Rule:** Client components never receive raw database credentials, private signing keys, or unredacted system models.
+
+### Server Actions & Backend Services (`"use server"`)
+- Files under `src/server/` and `src/core/` execute strictly in the Node.js server runtime.
+- **Session & Tenancy Enforcement:** Every action extracts the authenticated user and tenant ID from the cryptographically verified `__Host-Session` cookie. The client cannot forge or override `tenantId`.
+- **RBAC Assertions:** Mutations verify role permissions (`assertPermission(role, action)`) on the server.
+- **Timing-Safe Verification:** Cryptographic tokens (e.g. Client Portal access) use `crypto.timingSafeEqual` with buffer length validation to prevent timing attacks.
+
+---
+
+## 4. TypeScript & Import Resolution
+
+To resolve TypeScript compiler diagnostics such as:
+> `An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.`
+
+`tsconfig.json` is configured with:
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*", "tests/**/*"]
+}
 ```
+This enables native TypeScript imports ending with `.ts` while maintaining full compatibility with Node 24 native strip types.
 
-### 3. Apply Prisma Migrations
-```bash
-docker compose exec app npx prisma migrate deploy
-```
+---
 
-### 4. Configure Nginx Reverse Proxy with SSL (Certbot)
-Configure Nginx to proxy incoming traffic on port 80/443 with wildcard or multi-domain SSL certificates (`certbot --nginx -d yourdomain.com -d www.yourdomain.com -d go.yourdomain.com -d login.yourdomain.com`).
+## 5. Documentation Directory
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Complete system blueprint, invariants, and domain models.
+- [SECURITY.md](SECURITY.md) - Security invariants, WebAuthn, brute-force lockout, and REA security audit.
+- [REVERSE_ENGINEERING.md](REVERSE_ENGINEERING.md) - Clean-room extraction guide and REA tool usage.
+- [TEAM_GUIDE.md](TEAM_GUIDE.md) - Multi-agent team collaboration protocols and invocation workflows.
