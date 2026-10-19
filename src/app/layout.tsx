@@ -2,13 +2,17 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Quotes – PB Style Homes Pty Ltd – Xero",
-  description: "Xero Cloud Accounting & Online Quoting Module",
+  title: "Quotes – Alpha Steel Frames",
+  description: "Alpha Steel Frames Cloud Accounting & Quotation Management System",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/logo.png",
+    apple: "/icons/icon-192x192.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Xero",
+    title: "AlphaSteel",
   },
 };
 
@@ -27,7 +31,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/logo.png" sizes="any" />
       </head>
       <body className="min-h-screen bg-[#f8f9fa] text-gray-900 antialiased">
         {children}

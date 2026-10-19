@@ -1,18 +1,19 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma.ts";
+import { getSessionUser } from "../../../../../lib/auth-guard.ts";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const tenantId = request.headers.get("x-tenant-id") || "tenant-pbstylehomes";
+    const user = await getSessionUser(request);
     const quoteId = params.id;
     const body = await request.json().catch(() => ({}));
 
     const quote = await prisma.quote.findFirst({
       where: {
-        tenantId,
         OR: [{ id: quoteId }, { quoteNumber: quoteId }],
       },
       include: { contact: true },
@@ -22,20 +23,27 @@ export async function POST(
       return NextResponse.json({ success: false, error: "Quote not found" }, { status: 404 });
     }
 
+    if (quote.status === "CONVERTED_TO_INVOICE") {
+      return NextResponse.json(
+        { success: false, error: "Quote is already converted to an invoice" },
+        { status: 400 }
+      );
+    }
+
     const updated = await prisma.quote.update({
       where: { id: quote.id },
       data: { status: "ACCEPTED" },
     });
 
-    await prisma.auditLog.create({
+    const authorName = user?.name || "Alpha Admin";
+    const detail = body.note ? `Accepted: ${body.note}` : "Quote marked as accepted.";
+
+    await prisma.quoteHistory.create({
       data: {
-        tenantId,
+        quoteId: quote.id,
+        user: authorName,
         action: "Accepted",
-        entityType: "QUOTE",
-        entityId: quote.id,
-        payload: {
-          detail: `Quote accepted. ${body.note || ""}`.trim(),
-        },
+        detail,
       },
     });
 

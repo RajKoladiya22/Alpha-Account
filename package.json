@@ -1,12 +1,12 @@
 {
-  "name": "xero-core-engine",
+  "name": "alpha-steel-frames-engine",
   "version": "1.0.0",
-  "description": "Production-grade, multi-tenant cloud financial accounting and document lifecycle engine",
+  "description": "Production-ready accounting and quotation management system for Alpha Steel Frames",
   "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node server.js",
     "start:custom": "node --experimental-strip-types server.js",
     "connect": "bash connect",
     "connect-db": "bash connect db",

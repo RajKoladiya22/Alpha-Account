@@ -51,6 +51,34 @@ export default function QuoteDetailPage() {
     fetchQuote();
   };
 
+  const handleRevise = async () => {
+    try {
+      const res = await fetch(`/api/quotes/${id}/revise`, { method: "POST" });
+      const data = await res.json();
+      if (data.success && data.quote) {
+        router.push(`/quotes/${data.quote.id}`);
+      } else {
+        alert(data.error || "Failed to create quote revision");
+      }
+    } catch (e: any) {
+      alert(e.message || "An error occurred creating revision");
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      const res = await fetch(`/api/quotes/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        router.push("/quotes");
+      } else {
+        alert(data.error || "Failed to delete quote");
+      }
+    } catch (e: any) {
+      alert(e.message || "Error deleting quote");
+    }
+  };
+
   const handleConvertToInvoice = async () => {
     const res = await fetch(`/api/quotes/${id}/convert-to-invoice`, { method: "POST" });
     const data = await res.json();
@@ -74,9 +102,9 @@ export default function QuoteDetailPage() {
   return (
     <div className="min-h-screen bg-[#f8f9fa]">
       <AppHeader
-        organizationName="PB Style Homes Pty Ltd"
-        activeNav="Sales"
-        userInitials="SB"
+        organizationName="Alpha Steel Frames"
+        activeNav="Quotes"
+        userInitials="AA"
       />
       <main>
         {loading || !quote ? (
@@ -86,12 +114,15 @@ export default function QuoteDetailPage() {
         ) : (
           <QuoteView
             quote={quote}
-            organizationName="PB Style Homes Pty Ltd"
+            organizationName="Alpha Steel Frames"
             onBackToList={() => router.push("/quotes")}
+            onEdit={() => router.push(`/quotes/${id}/edit`)}
+            onPrintPdf={() => window.open(`/quotes/${id}/print`, "_blank")}
             onMarkAccepted={handleMarkAccepted}
             onSend={handleSend}
             onMarkDeclined={handleMarkDeclined}
-            onRevise={() => router.push(`/quotes/new?revise=${id}`)}
+            onRevise={handleRevise}
+            onDelete={handleDelete}
             onCopyToInvoice={handleConvertToInvoice}
             onAddNote={handleAddNote}
           />

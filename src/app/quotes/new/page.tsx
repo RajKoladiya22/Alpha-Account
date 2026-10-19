@@ -60,9 +60,9 @@ export default function NewQuotePage() {
   return (
     <div className="min-h-screen bg-[#f8f9fa]">
       <AppHeader
-        organizationName="PB Style Homes Pty Ltd"
-        activeNav="Sales"
-        userInitials="SB"
+        organizationName="Alpha Steel Frames"
+        activeNav="Quotes"
+        userInitials="AA"
       />
       <main>
         <QuoteEditor

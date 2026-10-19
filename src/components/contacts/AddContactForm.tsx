@@ -51,7 +51,7 @@ export const AddContactForm: React.FC<AddContactFormProps> = ({
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 py-6 font-sans text-gray-800">
+    <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 py-6 font-sans text-gray-800">
       {/* Header and Breadcrumb */}
       <div className="pb-3 mb-6 border-b border-gray-200">
         <nav className="text-xs text-gray-500 mb-1">

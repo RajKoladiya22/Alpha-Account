@@ -1,23 +1,45 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma.ts";
+import { getSessionUser } from "../../../../lib/auth-guard.ts";
+import {
+  calculateQuoteFinancials,
+  validateLineItems,
+  formatAUD,
+} from "../../../../core/quotes/quote-calculator.ts";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const tenantId = request.headers.get("x-tenant-id") || "tenant-pbstylehomes";
+    const user = await getSessionUser(request);
+    const tenantId =
+      user?.tenantId ||
+      request.headers.get("x-tenant-id") ||
+      "tenant-alphasteel";
     const quoteId = params.id;
 
-    // Check by id or by quoteNumber (e.g. QU-0006)
     const quote = await prisma.quote.findFirst({
       where: {
-        tenantId,
-        OR: [{ id: quoteId }, { quoteNumber: quoteId }],
+        OR: [
+          { id: quoteId },
+          { quoteNumber: quoteId },
+        ],
       },
       include: {
         contact: true,
         lines: true,
+        history: {
+          orderBy: { timestamp: "desc" },
+        },
+        parentQuote: {
+          select: { id: true, quoteNumber: true, totalAmount: true },
+        },
+        revisions: {
+          select: { id: true, quoteNumber: true, totalAmount: true, status: true, revisionNumber: true },
+          orderBy: { revisionNumber: "asc" },
+        },
       },
     });
 
@@ -28,66 +50,56 @@ export async function GET(
       );
     }
 
-    // Fetch audit history logs for this quote
-    const logs = await prisma.auditLog.findMany({
-      where: {
-        tenantId,
-        entityId: quote.id,
-      },
-      orderBy: { timestamp: "desc" },
-    });
-
-    const history = logs.map((log) => ({
-      id: log.id,
-      timestamp: log.timestamp.toISOString(),
-      user: "Barinder singh",
-      action: log.action,
-      detail: (log.payload as any)?.detail || (log.payload as any)?.note || `Action ${log.action} performed`,
-    }));
-
-    // If history is empty, add default system records matching screenshot image copy 12.png
-    if (history.length === 0) {
-      history.push({
-        id: "hist-1",
-        timestamp: new Date(quote.createdAt).toISOString(),
-        user: "Barinder singh",
-        action: "Created",
-        detail: `Quote ${quote.quoteNumber} to ${quote.contact.name} for ${Number(quote.totalAmount).toLocaleString("en-AU", { minimumFractionDigits: 2 })}.`,
-      });
-      if (quote.status === "SENT" || quote.status === "ACCEPTED") {
-        history.unshift({
-          id: "hist-2",
-          timestamp: new Date(quote.createdAt.getTime() + 1000).toISOString(),
-          user: "Barinder singh",
-          action: "Sent",
-          detail: `Quote ${quote.quoteNumber} to ${quote.contact.name} for ${Number(quote.totalAmount).toLocaleString("en-AU", { minimumFractionDigits: 2 })} sent to ${quote.contact.email || "client@email.com"}.`,
-        });
-        history.unshift({
-          id: "hist-3",
-          timestamp: new Date(quote.createdAt.getTime() + 50000).toISOString(),
-          user: "System Generated",
-          action: "Quote viewed",
-          detail: "This quote has been viewed online",
-        });
-      }
-    }
-
     return NextResponse.json({
       success: true,
       quote: {
-        ...quote,
+        id: quote.id,
+        tenantId: quote.tenantId,
+        quoteNumber: quote.quoteNumber,
+        reference: quote.reference || "",
+        title: quote.title || "",
+        summary: quote.summary || "",
+        terms: quote.terms || "",
+        currency: quote.currency,
+        taxTreatment: quote.taxTreatment,
+        date: quote.date.toISOString(),
+        expiryDate: quote.expiryDate.toISOString(),
+        status: quote.status,
         subtotal: Number(quote.subtotal),
         taxTotal: Number(quote.taxTotal),
         totalAmount: Number(quote.totalAmount),
+        revisionNumber: quote.revisionNumber,
+        parentQuoteId: quote.parentQuoteId,
+        parentQuote: quote.parentQuote,
+        revisions: quote.revisions,
+        contact: quote.contact
+          ? {
+              id: quote.contact.id,
+              name: quote.contact.name,
+              email: quote.contact.email,
+              phone: quote.contact.phone,
+              address: quote.contact.address,
+            }
+          : null,
         lines: quote.lines.map((l) => ({
-          ...l,
+          id: l.id,
+          itemCode: l.itemCode || "",
+          description: l.description,
           quantity: Number(l.quantity),
           unitPrice: Number(l.unitPrice),
           discount: Number(l.discount),
           taxRate: Number(l.taxRate),
           lineAmount: Number(l.lineAmount),
+          accountId: l.accountId || "200",
         })),
-        history,
+        history: quote.history.map((h) => ({
+          id: h.id,
+          timestamp: h.timestamp.toISOString(),
+          user: h.user,
+          action: h.action,
+          detail: h.detail,
+          isNote: h.isNote,
+        })),
       },
     });
   } catch (err: any) {
@@ -104,22 +116,140 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const tenantId = request.headers.get("x-tenant-id") || "tenant-pbstylehomes";
+    const user = await getSessionUser(request);
     const quoteId = params.id;
     const body = await request.json();
 
-    const quote = await prisma.quote.updateMany({
+    const existingQuote = await prisma.quote.findFirst({
       where: {
-        tenantId,
         OR: [{ id: quoteId }, { quoteNumber: quoteId }],
       },
-      data: {
-        status: body.status,
-      },
+      include: { lines: true },
     });
 
-    return NextResponse.json({ success: true, updated: quote.count });
+    if (!existingQuote) {
+      return NextResponse.json(
+        { success: false, error: "Quote not found" },
+        { status: 404 }
+      );
+    }
+
+    if (
+      existingQuote.status === "CONVERTED_TO_INVOICE" ||
+      existingQuote.status === "ACCEPTED"
+    ) {
+      // If only updating status
+      if (body.status && Object.keys(body).length === 1) {
+        await prisma.quote.update({
+          where: { id: existingQuote.id },
+          data: { status: body.status },
+        });
+        return NextResponse.json({ success: true, message: "Status updated" });
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Cannot modify lines or details of quote in status ${existingQuote.status}. Use 'Revise' to create a new revision.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const {
+      contactId,
+      issueDate,
+      expiryDate,
+      reference,
+      title,
+      summary,
+      terms,
+      currency = existingQuote.currency || "AUD",
+      taxTreatment = existingQuote.taxTreatment || "EXCLUSIVE",
+      lines = existingQuote.lines,
+      status = existingQuote.status,
+    } = body;
+
+    // Validate line items
+    if (lines && lines.length > 0) {
+      const lineValidation = validateLineItems(lines);
+      if (!lineValidation.valid) {
+        return NextResponse.json(
+          { success: false, error: lineValidation.errors.join("; ") },
+          { status: 400 }
+        );
+      }
+    }
+
+    const financialSummary = calculateQuoteFinancials(lines, taxTreatment);
+    const authorName = user?.name || "Alpha Admin";
+
+    const updatedQuote = await prisma.$transaction(async (tx) => {
+      // Delete old lines
+      await tx.quoteLine.deleteMany({
+        where: { quoteId: existingQuote.id },
+      });
+
+      // Update quote record
+      const quote = await tx.quote.update({
+        where: { id: existingQuote.id },
+        data: {
+          contactId: contactId || existingQuote.contactId,
+          reference: reference !== undefined ? reference : existingQuote.reference,
+          title: title !== undefined ? title : existingQuote.title,
+          summary: summary !== undefined ? summary : existingQuote.summary,
+          terms: terms !== undefined ? terms : existingQuote.terms,
+          currency,
+          taxTreatment,
+          date: issueDate ? new Date(issueDate) : existingQuote.date,
+          expiryDate: expiryDate ? new Date(expiryDate) : existingQuote.expiryDate,
+          status: status || existingQuote.status,
+          subtotal: financialSummary.subtotal,
+          taxTotal: financialSummary.taxTotal,
+          totalAmount: financialSummary.totalAmount,
+          lines: {
+            create: financialSummary.lines.map((l) => ({
+              itemCode: l.itemCode || null,
+              description: l.description,
+              quantity: l.quantity,
+              unitPrice: l.unitPrice,
+              discount: l.discount,
+              taxRate: l.taxRate,
+              lineAmount: l.lineAmount,
+              accountId: l.accountId || "200",
+            })),
+          },
+          history: {
+            create: [
+              {
+                user: authorName,
+                action: "Edited",
+                detail: `Quote updated. Authoritative total: ${formatAUD(financialSummary.totalAmount)} AUD.`,
+              },
+            ],
+          },
+        },
+        include: {
+          contact: true,
+          lines: true,
+          history: { orderBy: { timestamp: "desc" } },
+        },
+      });
+
+      return quote;
+    });
+
+    return NextResponse.json({
+      success: true,
+      quote: {
+        ...updatedQuote,
+        subtotal: Number(updatedQuote.subtotal),
+        taxTotal: Number(updatedQuote.taxTotal),
+        totalAmount: Number(updatedQuote.totalAmount),
+      },
+    });
   } catch (err: any) {
+    console.error("PUT /api/quotes/[id] error:", err);
     return NextResponse.json(
       { success: false, error: err.message || "Failed to update quote" },
       { status: 500 }
@@ -132,14 +262,29 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const tenantId = request.headers.get("x-tenant-id") || "tenant-pbstylehomes";
     const quoteId = params.id;
-
-    await prisma.quote.deleteMany({
+    const existing = await prisma.quote.findFirst({
       where: {
-        tenantId,
         OR: [{ id: quoteId }, { quoteNumber: quoteId }],
       },
+    });
+
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: "Quote not found" },
+        { status: 404 }
+      );
+    }
+
+    if (existing.status === "CONVERTED_TO_INVOICE") {
+      return NextResponse.json(
+        { success: false, error: "Cannot delete quote that has already been converted to an invoice" },
+        { status: 400 }
+      );
+    }
+
+    await prisma.quote.delete({
+      where: { id: existing.id },
     });
 
     return NextResponse.json({ success: true, message: "Quote deleted successfully" });

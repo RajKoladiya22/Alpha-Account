@@ -13,7 +13,7 @@ export interface ClientPortalViewProps {
 
 export const ClientPortalView: React.FC<ClientPortalViewProps> = ({
   quote,
-  organizationName = "PB Style Homes Pty Ltd",
+  organizationName = "Alpha Steel Frames",
   onAccept,
   onDecline,
   onPrintPdf,
@@ -162,7 +162,7 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({
             <tbody className="divide-y divide-gray-100">
               {quote.lines.map((l) => (
                 <tr key={l.id}>
-                  <td className="py-3 text-gray-800 font-medium">{l.description}</td>
+                  <td className="py-3 text-gray-800 font-medium whitespace-pre-line leading-relaxed">{l.description}</td>
                   <td className="py-3 text-right text-gray-600">{l.quantity}</td>
                   <td className="py-3 text-right text-gray-600">{l.unitPrice.toFixed(2)}</td>
                   <td className="py-3 text-right font-medium text-gray-900">{l.lineAmount.toFixed(2)}</td>

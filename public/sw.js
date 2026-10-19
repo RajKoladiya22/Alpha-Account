@@ -1,18 +1,18 @@
-// Progressive Web App Service Worker for Xero
-const CACHE_NAME = "xero-pwa-cache-v1";
-const ASSETS_TO_CACHE = [
-  "/",
-  "/quotes",
-  "/contacts/customers",
-  "/settings",
+// Progressive Web App Service Worker for Alpha Steel Frames
+// Secure static-only cache: Financial and authenticated data is NEVER cached.
+const CACHE_NAME = "asf-pwa-static-v2";
+const STATIC_ASSETS = [
   "/manifest.json",
+  "/logo.png",
+  "/icons/icon-192x192.png",
+  "/icons/icon-512x512.png",
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE).catch(() => {
-        // Safe fallback in dynamic environments
+      return cache.addAll(STATIC_ASSETS).catch((err) => {
+        console.warn("[PWA SW] Pre-caching static assets failed:", err);
       });
     })
   );
@@ -33,8 +33,26 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Pass API and non-GET calls straight to the network
-  if (event.request.method !== "GET" || event.request.url.includes("/api/")) {
+  const url = new URL(event.request.url);
+
+  // Strictly NEVER cache financial, accounting, user, or dynamic API endpoints
+  if (
+    event.request.method !== "GET" ||
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/quotes") ||
+    url.pathname.startsWith("/contacts") ||
+    url.pathname.startsWith("/settings") ||
+    url.pathname.startsWith("/setup") ||
+    url.pathname.startsWith("/portal")
+  ) {
+    return;
+  }
+
+  // Cache-first only for static assets, network-first for everything else
+  if (STATIC_ASSETS.includes(url.pathname)) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => cached || fetch(event.request))
+    );
     return;
   }
 

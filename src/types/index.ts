@@ -221,21 +221,6 @@ export interface MatchResult {
   reason: string;
 }
 
-// Invariant 5: JAX Tool Calling & Streaming Contracts
-export interface JaxToolCall {
-  toolName: "lookup_item_prices" | "create_draft_invoice" | "draft_customer_email" | "authorize_invoice";
-  parameters: Record<string, any>;
-}
-
-export interface JaxAuditRecord {
-  id: string;
-  tenantId: string;
-  userId?: string;
-  toolName: string;
-  parameters: Record<string, any>;
-  result: Record<string, any>;
-  timestamp: Date;
-}
 
 // Contacts & Customers
 export interface ContactAddress {

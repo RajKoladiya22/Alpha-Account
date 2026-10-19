@@ -1,18 +1,20 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma.ts";
+import { getSessionUser } from "../../../../../lib/auth-guard.ts";
+import { formatAUD } from "../../../../../core/quotes/quote-calculator.ts";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const tenantId = request.headers.get("x-tenant-id") || "tenant-pbstylehomes";
+    const user = await getSessionUser(request);
     const quoteId = params.id;
     const body = await request.json().catch(() => ({}));
 
     const quote = await prisma.quote.findFirst({
       where: {
-        tenantId,
         OR: [{ id: quoteId }, { quoteNumber: quoteId }],
       },
       include: { contact: true },
@@ -28,17 +30,18 @@ export async function POST(
     });
 
     const recipient = body.recipientEmail || quote.contact.email || "client@email.com";
+    const authorName = user?.name || "Alpha Admin";
+    const detail = body.markOnly
+      ? `Quote marked as sent by ${authorName}.`
+      : `Quote ${quote.quoteNumber} to ${quote.contact.name} for ${formatAUD(Number(quote.totalAmount))} sent to ${recipient}.`;
 
-    // Record audit log
-    await prisma.auditLog.create({
+    // Persist to QuoteHistory
+    await prisma.quoteHistory.create({
       data: {
-        tenantId,
+        quoteId: quote.id,
+        user: authorName,
         action: "Sent",
-        entityType: "QUOTE",
-        entityId: quote.id,
-        payload: {
-          detail: `Quote ${quote.quoteNumber} to ${quote.contact.name} for ${Number(quote.totalAmount).toLocaleString("en-AU", { minimumFractionDigits: 2 })} sent to ${recipient}.`,
-        },
+        detail,
       },
     });
 

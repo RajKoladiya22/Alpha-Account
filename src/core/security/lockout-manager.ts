@@ -143,7 +143,7 @@ export class LockoutManager {
     return {
       success: true,
       penalized: false,
-      message: "Password reset dispatched from security@identity.post.xero.com. Valid for 48 hours.",
+      message: "Password reset dispatched from security@alphasteelframes.com.au. Valid for 48 hours.",
       resetToken: `rst_${Buffer.from(`${userId}:${now.getTime()}`).toString("base64")}`,
     };
   }

@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AppHeader } from "../../components/layout/AppHeader";
@@ -36,9 +38,9 @@ export default function QuotesPage() {
   return (
     <div className="min-h-screen bg-[#f8f9fa]">
       <AppHeader
-        organizationName="PB Style Homes Pty Ltd"
-        activeNav="Sales"
-        userInitials="SB"
+        organizationName="Alpha Steel Frames"
+        activeNav="Quotes"
+        userInitials="AA"
       />
       <main>
         {loading && quotes.length === 0 ? (

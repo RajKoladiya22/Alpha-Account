@@ -5,13 +5,12 @@ export type MfeEventType =
   | "INVOICE_AUTHORIZED"
   | "BILL_CREATED"
   | "BANK_LINE_RECONCILED"
-  | "JAX_ACTION_DISPATCHED"
   | "LOCKOUT_TRIGGERED";
 
 export interface MfeEvent<T = any> {
   type: MfeEventType;
   tenantId: string;
-  sourceMfe: "INVOICING" | "BILLS" | "BANKING" | "JAX" | "AUTH_SHELL";
+  sourceMfe: "INVOICING" | "BILLS" | "BANKING" | "AUTH_SHELL";
   payload: T;
   timestamp: Date;
 }

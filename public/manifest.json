@@ -1,6 +1,7 @@
 {
-  "short_name": "Xero",
-  "name": "Xero Cloud Accounting & Quoting",
+  "short_name": "AlphaSteel",
+  "name": "Alpha Steel Frames - Quotation & Accounting",
+  "description": "Commercial steel framing quotation and business accounting management system",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",

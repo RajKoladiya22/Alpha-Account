@@ -13,11 +13,11 @@ export class TenantService {
   private seedDefaultOrganization() {
     const defaultOrg: OrganizationEntity = {
       id: "tenant-default",
-      name: "PB Style Homes Pty Ltd",
-      subdomain: "pbstylehomes",
+      name: "Alpha Steel Frames",
+      subdomain: "alphasteel",
       currency: "AUD",
-      legalTradingName: "PB Style Homes Proprietary Limited",
-      registrationNumber: "ABN 51 824 753 556",
+      legalTradingName: "Alpha Steel Frames Pty Ltd",
+      registrationNumber: "ABN 45 678 901 234",
       organizationType: "Company",
       createdAt: new Date(),
     };

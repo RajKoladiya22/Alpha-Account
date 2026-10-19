@@ -35,9 +35,9 @@ export default function AddContactPage() {
   return (
     <div className="min-h-screen bg-[#f8f9fa]">
       <AppHeader
-        organizationName="PB Style Homes Pty Ltd"
+        organizationName="Alpha Steel Frames"
         activeNav="Contacts"
-        userInitials="SB"
+        userInitials="AA"
       />
       <main>
         <AddContactForm

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -15,7 +16,7 @@ export default function ForgotPasswordPage() {
 
     setTimeout(() => {
       setStatus(
-        "If an account exists with this email, a password recovery link has been dispatched to your primary and dual-rail backup addresses."
+        "If an account exists with this email, a password recovery link has been dispatched to your authorized email address."
       );
       setLoading(false);
     }, 700);
@@ -23,11 +24,17 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen bg-[#f4f5f7] flex flex-col justify-center items-center px-4 font-sans text-gray-800">
-      <div className="mb-6 flex items-center space-x-2">
-        <div className="w-9 h-9 bg-[#0084c7] rounded-full flex items-center justify-center font-bold text-white text-base shadow-sm">
-          x
-        </div>
-        <span className="text-[#001e4d] text-2xl font-bold tracking-tight">xero</span>
+      <div className="mb-6 flex items-center space-x-3">
+        <Image
+          src="/logo.png"
+          alt="Alpha Steel Frames"
+          width={40}
+          height={40}
+          className="rounded shadow-sm"
+        />
+        <span className="text-[#001e4d] text-2xl font-bold tracking-tight">
+          Alpha Steel Frames
+        </span>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg shadow-md max-w-sm w-full p-8">
@@ -50,7 +57,7 @@ export default function ForgotPasswordPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
+                placeholder="you@alphasteelframes.com.au"
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#006fe6]"
               />

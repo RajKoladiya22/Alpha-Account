@@ -163,7 +163,7 @@ describe("Invariant 1: 15-Minute Sliding-Window Brute-Force Lockout & Reset Pena
     const res = lockout.requestPasswordReset(userId);
     assert.equal(res.success, true);
     assert.equal(res.penalized, false);
-    assert.ok(res.message.includes("security@identity.post.xero.com"));
+    assert.ok(res.message.includes("security@alphasteelframes.com.au"));
     assert.ok(res.resetToken);
   });
 });

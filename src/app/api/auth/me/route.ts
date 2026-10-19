@@ -1,63 +1,42 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "node:crypto";
-import { prisma } from "../../../../lib/prisma.ts";
+import { getSessionUser } from "../../../../lib/auth-guard.ts";
 
 export async function GET(request: NextRequest) {
   try {
-    const cookie = request.cookies.get("xero_session")?.value;
-    const authHeader = request.headers.get("authorization")?.replace("Bearer ", "");
-    const token = cookie || authHeader;
+    const user = await getSessionUser(request);
 
-    if (!token) {
-      // Default fallback demo user for smooth testing
-      const defaultTenant = await prisma.tenant.findFirst();
-      const defaultUser = await prisma.user.findFirst();
-      return NextResponse.json({
-        success: true,
-        authenticated: true,
-        user: {
-          id: defaultUser?.id || "user-barinder",
-          name: defaultUser?.name || "Barinder singh",
-          email: defaultUser?.email || "estimate@pbstylehomes.com.au",
-          initials: "SB",
-          role: "OWNER",
-          activeTenantId: defaultTenant?.id || "tenant-pbstylehomes",
-          organizationName: defaultTenant?.name || "PB Style Homes Pty Ltd",
-        },
-      });
+    if (!user) {
+      return NextResponse.json(
+        { success: false, authenticated: false, error: "Unauthenticated" },
+        { status: 401 }
+      );
     }
 
-    const parts = token.split(".");
-    if (parts.length !== 3) {
-      return NextResponse.json({ success: false, authenticated: false }, { status: 401 });
-    }
-
-    const [b64Header, b64Payload, sig] = parts;
-    const secret = process.env.JWT_SECRET || "fintech_super_secure_jwt_signing_key_32bytes_long!";
-    const expected = crypto.createHmac("sha256", secret).update(`${b64Header}.${b64Payload}`).digest("base64url");
-    if (sig !== expected) {
-      return NextResponse.json({ success: false, authenticated: false }, { status: 401 });
-    }
-
-    const payload = JSON.parse(Buffer.from(b64Payload, "base64url").toString("utf8"));
-    if (payload.exp < Math.floor(Date.now() / 1000)) {
-      return NextResponse.json({ success: false, authenticated: false, error: "Session expired" }, { status: 401 });
-    }
+    // Determine initials
+    const parts = user.name.trim().split(" ");
+    const initials =
+      parts.length > 1
+        ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+        : user.name.slice(0, 2).toUpperCase();
 
     return NextResponse.json({
       success: true,
       authenticated: true,
       user: {
-        id: payload.userId,
-        name: payload.name,
-        email: payload.email,
-        initials: "SB",
-        role: payload.role,
-        activeTenantId: payload.activeTenantId,
-        organizationName: payload.organizationName,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        initials,
+        role: user.role,
+        activeTenantId: user.tenantId,
+        organizationName: user.tenantName,
       },
     });
   } catch (err: any) {
-    return NextResponse.json({ success: false, authenticated: false }, { status: 401 });
+    return NextResponse.json(
+      { success: false, authenticated: false, error: "Authentication verification failed" },
+      { status: 401 }
+    );
   }
 }

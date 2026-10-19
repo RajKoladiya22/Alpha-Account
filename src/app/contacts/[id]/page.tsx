@@ -15,7 +15,28 @@ export default function ContactDetailPage() {
   const [activityTab, setActivityTab] = useState<"All" | "Invoices" | "Quotes">("All");
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    taxNumber: "",
+    isCustomer: true,
+    isSupplier: false,
+  });
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Hard delete modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Actions menu state
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  const fetchContact = () => {
     if (id) {
       fetch(`/api/contacts/${id}`)
         .then((res) => res.json())
@@ -24,7 +45,72 @@ export default function ContactDetailPage() {
         })
         .finally(() => setLoading(false));
     }
+  };
+
+  useEffect(() => {
+    fetchContact();
   }, [id]);
+
+  const handleOpenEdit = () => {
+    setShowActionsMenu(false);
+    if (!contact) return;
+    setEditForm({
+      name: contact.name || "",
+      email: contact.email || "",
+      phone: contact.phone || "",
+      address: contact.address || "",
+      taxNumber: contact.taxNumber || "",
+      isCustomer: contact.isCustomer !== undefined ? contact.isCustomer : true,
+      isSupplier: contact.isSupplier !== undefined ? contact.isSupplier : false,
+    });
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editForm.name.trim() || isSavingEdit) return;
+    setIsSavingEdit(true);
+    try {
+      const res = await fetch(`/api/contacts/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editForm),
+      });
+      const data = await res.json();
+      if (data.success && data.contact) {
+        setContact((prev: any) => ({ ...prev, ...data.contact }));
+        setShowEditModal(false);
+        setNotification({ type: "success", message: "Customer details updated successfully." });
+        setTimeout(() => setNotification(null), 4000);
+      } else {
+        alert(data.error || "Failed to update contact");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to update contact");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleHardDelete = async () => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/contacts/${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        router.push("/contacts/customers");
+      } else {
+        alert(data.error || "Failed to delete contact");
+        setIsDeleting(false);
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to delete contact");
+      setIsDeleting(false);
+    }
+  };
 
   if (loading || !contact) {
     return (
@@ -53,12 +139,36 @@ export default function ContactDetailPage() {
   return (
     <div className="min-h-screen bg-[#f8f9fa] text-gray-800 font-sans">
       <AppHeader
-        organizationName="PB Style Homes Pty Ltd"
+        organizationName="Alpha Steel Frames"
         activeNav="Contacts"
-        userInitials="SB"
+        userInitials="AA"
       />
 
-      <main className="max-w-7xl mx-auto px-4 py-5">
+      {/* Global Notification Banner */}
+      {notification && (
+        <div className="max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 pt-4">
+          <div
+            className={`p-3.5 rounded-md flex items-center justify-between text-sm sm:text-base font-medium shadow-xs animate-in fade-in duration-150 ${
+              notification.type === "success"
+                ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                : "bg-red-50 text-red-800 border border-red-200"
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <span>{notification.type === "success" ? "✓" : "⚠️"}</span>
+              <span>{notification.message}</span>
+            </div>
+            <button
+              onClick={() => setNotification(null)}
+              className="text-gray-400 hover:text-gray-600 font-bold ml-4"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      <main className="max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 py-5">
         {/* Breadcrumb */}
         <div className="text-xs text-[#006fe6] hover:underline cursor-pointer mb-2">
           <span onClick={() => router.push("/contacts/customers")}>Contacts</span>
@@ -84,8 +194,11 @@ export default function ContactDetailPage() {
             </div>
           </div>
 
-          <div className="flex items-center space-x-2 mt-4 md:mt-0">
-            <button className="px-3.5 py-1.5 border border-gray-300 bg-white hover:bg-gray-50 rounded text-sm font-medium text-gray-700">
+          <div className="flex items-center space-x-2 mt-4 md:mt-0 relative">
+            <button
+              onClick={handleOpenEdit}
+              className="px-3.5 py-1.5 border border-gray-300 bg-white hover:bg-gray-50 rounded text-sm font-medium text-gray-700 transition"
+            >
               Edit
             </button>
             <div className="inline-flex rounded shadow-sm">
@@ -95,13 +208,56 @@ export default function ContactDetailPage() {
               >
                 New
               </button>
-              <button className="px-2 py-1.5 bg-[#13893a] hover:bg-[#0f6f2e] text-white rounded-r border-l border-green-700">
+              <button
+                onClick={() => router.push("/quotes/new")}
+                className="px-2 py-1.5 bg-[#13893a] hover:bg-[#0f6f2e] text-white rounded-r border-l border-green-700"
+              >
                 ▼
               </button>
             </div>
-            <button className="p-1.5 text-gray-500 hover:text-gray-700">
-              ⋮
-            </button>
+
+            {/* Actions button & dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowActionsMenu(!showActionsMenu)}
+                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition"
+              >
+                ⋮
+              </button>
+              {showActionsMenu && (
+                <div className="absolute right-0 top-9 w-48 bg-white border border-gray-200 rounded-md shadow-xl z-30 py-1 text-xs sm:text-sm text-left">
+                  <button
+                    onClick={handleOpenEdit}
+                    className="w-full text-left px-3.5 py-2 hover:bg-gray-100 text-gray-700 flex items-center space-x-2"
+                  >
+                    <span>✏️</span>
+                    <span>Edit contact</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowActionsMenu(false);
+                      router.push("/quotes/new");
+                    }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-gray-100 text-gray-700 flex items-center space-x-2"
+                  >
+                    <span>📄</span>
+                    <span>New quote</span>
+                  </button>
+                  <div className="border-t border-gray-100 my-1"></div>
+                  <button
+                    onClick={() => {
+                      setShowActionsMenu(false);
+                      setShowDeleteModal(true);
+                    }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-red-50 text-red-600 font-semibold flex items-center space-x-2"
+                  >
+                    <span>🗑</span>
+                    <span>Hard delete contact</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -377,6 +533,162 @@ export default function ContactDetailPage() {
           </div>
         </div>
       </main>
+
+      {/* Edit Customer Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+              <h3 className="font-bold text-gray-900 text-base">Edit Contact: {contact.name}</h3>
+              <button
+                type="button"
+                onClick={() => setShowEditModal(false)}
+                className="text-gray-400 hover:text-gray-600 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-5 space-y-4 text-sm">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Contact Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-[#006fe6] focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-[#006fe6] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Phone</label>
+                  <input
+                    type="text"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-[#006fe6] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Postal Address</label>
+                <textarea
+                  rows={2}
+                  value={editForm.address}
+                  onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                  placeholder="Street, City, State, Postcode"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-[#006fe6] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Tax / ABN Number</label>
+                <input
+                  type="text"
+                  value={editForm.taxNumber}
+                  onChange={(e) => setEditForm({ ...editForm, taxNumber: e.target.value })}
+                  placeholder="e.g. 51 824 753 556"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-[#006fe6] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center space-x-6 pt-1">
+                <label className="flex items-center space-x-2 text-xs font-medium text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.isCustomer}
+                    onChange={(e) => setEditForm({ ...editForm, isCustomer: e.target.checked })}
+                    className="rounded border-gray-300 text-[#006fe6] focus:ring-0"
+                  />
+                  <span>Is Customer</span>
+                </label>
+
+                <label className="flex items-center space-x-2 text-xs font-medium text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.isSupplier}
+                    onChange={(e) => setEditForm({ ...editForm, isSupplier: e.target.checked })}
+                    className="rounded border-gray-300 text-[#006fe6] focus:ring-0"
+                  />
+                  <span>Is Supplier</span>
+                </label>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="px-4 py-2 bg-[#006fe6] hover:bg-[#005bb5] text-white rounded-md font-semibold disabled:opacity-50"
+                >
+                  {isSavingEdit ? "Saving..." : "Save changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Single Hard Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center space-x-3 text-red-600">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center font-bold text-lg shrink-0">
+                ⚠️
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 text-base">Permanently Delete Contact?</h3>
+                <p className="text-xs text-gray-500">This action is irreversible (Hard Delete).</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-700">
+              Are you sure you want to permanently delete <strong className="text-gray-900">{contact.name}</strong>?
+              This will remove all associated quotations, invoices, and accounting records from the database.
+            </p>
+
+            <div className="flex justify-end space-x-2 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-xs sm:text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleHardDelete}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-xs sm:text-sm font-semibold transition disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting..." : "Yes, permanently delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
