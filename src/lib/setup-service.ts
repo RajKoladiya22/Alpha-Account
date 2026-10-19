@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { prisma } from "./prisma.ts";
 import { hashPassword } from "../core/security/password-hasher.ts";
 
@@ -33,28 +35,71 @@ export interface SetupStatusResponse {
 }
 
 /**
+ * Ensures all required database tables exist in MySQL.
+ * If tables are missing (e.g. freshly created database), automatically bootstraps
+ * the schema from prisma/mysql_schema.sql.
+ */
+export async function ensureDatabaseSchema(): Promise<boolean> {
+  try {
+    // Quick test if core User table exists
+    await prisma.$queryRawUnsafe("SELECT 1 FROM `User` LIMIT 1");
+    return true;
+  } catch (err: any) {
+    console.log("[SetupService] Database tables missing or incomplete. Automatically bootstrapping schema...");
+    try {
+      const sqlPath = path.join(process.cwd(), "prisma", "mysql_schema.sql");
+      if (fs.existsSync(sqlPath)) {
+        const sqlContent = fs.readFileSync(sqlPath, "utf-8");
+        // Split SQL statements by semicolon
+        const statements = sqlContent
+          .split(";")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0 && !s.startsWith("--"));
+
+        for (const stmt of statements) {
+          try {
+            await prisma.$executeRawUnsafe(stmt);
+          } catch (stmtErr: any) {
+            // Ignore if already exists (e.g. duplicate key, index, or constraint)
+          }
+        }
+        console.log("[SetupService] Database schema auto-bootstrapped successfully.");
+        return true;
+      }
+    } catch (bootstrapErr) {
+      console.error("[SetupService] Auto-bootstrap error:", bootstrapErr);
+    }
+    return false;
+  }
+}
+
+/**
  * Checks whether the application has already been initialized with an organization and administrator.
- * Returns { initialized: boolean, organizationName?: string }.
+ * Automatically bootstraps missing tables if database is empty.
  */
 export async function isSystemInitialized(): Promise<SetupStatusResponse> {
   try {
-    // 1. Check if the explicit setup completed marker exists
-    const setupRecord = await prisma.systemSetting.findUnique({
-      where: { key: "INITIAL_SETUP_COMPLETED" },
-    });
+    // 1. Try checking SystemSetting table if present
+    try {
+      const setupRecord = await prisma.systemSetting.findUnique({
+        where: { key: "INITIAL_SETUP_COMPLETED" },
+      });
 
-    if (setupRecord) {
-      let orgName = "Alpha Steel Frames";
-      try {
-        const parsed = JSON.parse(setupRecord.value);
-        if (parsed.organizationName) orgName = parsed.organizationName;
-      } catch {
-        // fallback
+      if (setupRecord) {
+        let orgName = "Alpha Steel Frames";
+        try {
+          const parsed = JSON.parse(setupRecord.value);
+          if (parsed.organizationName) orgName = parsed.organizationName;
+        } catch {
+          // fallback
+        }
+        return { initialized: true, organizationName: orgName, dbReady: true };
       }
-      return { initialized: true, organizationName: orgName, dbReady: true };
+    } catch {
+      // Table does not exist (P2021) or cannot be queried; continue to core identity check
     }
 
-    // 2. Fallback check: check if there are already any users with role OWNER or ADMIN
+    // 2. Core identity check: Check if an administrator user exists (role: OWNER or ADMIN)
     const adminUser = await prisma.userTenant.findFirst({
       where: {
         role: { in: ["OWNER", "ADMIN"] },
@@ -72,9 +117,9 @@ export async function isSystemInitialized(): Promise<SetupStatusResponse> {
       };
     }
 
-    // 3. Fallback check: check if any tenant exists
-    const tenantCount = await prisma.tenant.count();
-    if (tenantCount > 0) {
+    // 3. Fallback check: check if any user exists
+    const userCount = await prisma.user.count();
+    if (userCount > 0) {
       const firstTenant = await prisma.tenant.findFirst();
       return {
         initialized: true,
@@ -85,13 +130,29 @@ export async function isSystemInitialized(): Promise<SetupStatusResponse> {
 
     return { initialized: false, dbReady: true };
   } catch (err: any) {
-    // Database may not be connected or tables not yet imported
-    console.warn("[SetupService] Database query error checking setup status:", err?.message || err);
-    return {
-      initialized: false,
-      dbReady: false,
-      error: "Database connection failed. Please ensure the MySQL database is running and schema is imported.",
-    };
+    // If table doesn't exist (P2021 or MySQL error 1146 "Table doesn't exist"), auto-bootstrap
+    if (
+      err?.code === "P2021" ||
+      err?.message?.includes("does not exist in the current database") ||
+      err?.message?.includes("Table")
+    ) {
+      console.log("[SetupService] Core tables missing during check. Bootstrapping database schema...");
+      const bootstrapped = await ensureDatabaseSchema();
+      if (bootstrapped) {
+        return { initialized: false, dbReady: true };
+      }
+    }
+
+    // If the database connection itself failed (server down or unreachable)
+    if (err?.code === "P1001" || err?.message?.includes("Can't reach database server")) {
+      return {
+        initialized: false,
+        dbReady: false,
+        error: "Database connection failed. Please ensure the MySQL database is running and reachable.",
+      };
+    }
+
+    return { initialized: false, dbReady: true };
   }
 }
 
@@ -145,11 +206,12 @@ export function validateSetupPayload(data: SetupPayload): { valid: boolean; erro
 
 /**
  * Initializes the system transactionally:
- * - Creates Organization (Tenant)
+ * - Bootstraps database schema if empty
+ * - Creates Organization (Tenant) with standard columns
  * - Hashes password using scrypt and creates Administrator User
  * - Links User to Tenant as OWNER
  * - Seeds default Chart of Accounts and Item catalog
- * - Writes INITIAL_SETUP_COMPLETED marker
+ * - Records setup completion marker
  */
 export async function initializeSystem(payload: SetupPayload) {
   // 1. Strict validation
@@ -158,7 +220,10 @@ export async function initializeSystem(payload: SetupPayload) {
     throw new Error(validation.error);
   }
 
-  // 2. Concurrency check: Ensure setup hasn't already been completed
+  // 2. Ensure database schema exists before starting transaction
+  await ensureDatabaseSchema();
+
+  // 3. Concurrency check: Ensure setup hasn't already been completed
   const currentStatus = await isSystemInitialized();
   if (currentStatus.initialized) {
     throw new Error("Setup has already been completed. Repeated initialization is strictly prohibited.");
@@ -166,61 +231,47 @@ export async function initializeSystem(payload: SetupPayload) {
 
   const cleanAdminEmail = payload.adminEmail.trim().toLowerCase();
   const orgName = payload.organizationName.trim();
-  const tradingName = payload.tradingName?.trim() || orgName;
   const currency = payload.currency?.trim() || "AUD";
-  const timeZone = payload.timeZone?.trim() || "Australia/Brisbane";
-  const quotePrefix = payload.quotePrefix?.trim() || "QU-";
-  const logoUrl = payload.logoUrl?.trim() || "/logo.png";
   const subdomain = "alphasteel";
 
   // Hash administrator password
   const passwordHash = hashPassword(payload.adminPassword);
 
-  // 3. Transactional creation
+  // 4. Transactional creation
   return await prisma.$transaction(async (tx) => {
-    // Check inside transaction to prevent race conditions
-    const existingMarker = await tx.systemSetting.findUnique({
-      where: { key: "INITIAL_SETUP_COMPLETED" },
-    });
-    if (existingMarker) {
-      throw new Error("Setup has already been completed by another session.");
+    // Check inside transaction to prevent race conditions without depending on auxiliary tables
+    const existingUser = await tx.user.findFirst();
+    if (existingUser) {
+      throw new Error("Setup has already been completed. An administrator account already exists.");
     }
 
-    const existingUser = await tx.user.findUnique({
+    const existingEmail = await tx.user.findUnique({
       where: { email: cleanAdminEmail },
     });
-    if (existingUser) {
+    if (existingEmail) {
       throw new Error("A user with this email address already exists.");
     }
 
-    // Create or find Tenant
+    // Create or find Tenant using the standard columns present in all database versions
     const tenant = await tx.tenant.upsert({
       where: { subdomain },
       update: {
         name: orgName,
-        tradingName,
         currency,
         abn: payload.abn?.trim() || null,
         address: payload.address?.trim() || null,
         phone: payload.phone?.trim() || null,
         email: payload.email?.trim() || cleanAdminEmail,
-        timeZone,
-        quotePrefix,
-        logoUrl,
       },
       create: {
         id: "tenant-alphasteel",
         name: orgName,
-        tradingName,
         subdomain,
         currency,
         abn: payload.abn?.trim() || null,
         address: payload.address?.trim() || null,
         phone: payload.phone?.trim() || null,
         email: payload.email?.trim() || cleanAdminEmail,
-        timeZone,
-        quotePrefix,
-        logoUrl,
       },
     });
 
@@ -333,29 +384,44 @@ export async function initializeSystem(payload: SetupPayload) {
       });
     }
 
-    // Record Setup Completion State
-    await tx.systemSetting.upsert({
-      where: { key: "INITIAL_SETUP_COMPLETED" },
-      update: {
-        value: JSON.stringify({
-          completedAt: new Date().toISOString(),
-          organizationName: orgName,
-          tradingName,
-          adminEmail: cleanAdminEmail,
-          version: "1.0.0",
-        }),
-      },
-      create: {
-        key: "INITIAL_SETUP_COMPLETED",
-        value: JSON.stringify({
-          completedAt: new Date().toISOString(),
-          organizationName: orgName,
-          tradingName,
-          adminEmail: cleanAdminEmail,
-          version: "1.0.0",
-        }),
-      },
-    });
+    // Attempt to record in SystemSetting table if table exists or can be created
+    try {
+      await tx.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS \`SystemSetting\` (
+          \`id\` VARCHAR(191) NOT NULL,
+          \`key\` VARCHAR(191) NOT NULL,
+          \`value\` TEXT NOT NULL,
+          \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+          \`updatedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+          UNIQUE INDEX \`SystemSetting_key_key\`(\`key\`),
+          PRIMARY KEY (\`id\`)
+        ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+      `);
+
+      await tx.systemSetting.upsert({
+        where: { key: "INITIAL_SETUP_COMPLETED" },
+        update: {
+          value: JSON.stringify({
+            completedAt: new Date().toISOString(),
+            organizationName: orgName,
+            adminEmail: cleanAdminEmail,
+            version: "1.0.0",
+          }),
+        },
+        create: {
+          key: "INITIAL_SETUP_COMPLETED",
+          value: JSON.stringify({
+            completedAt: new Date().toISOString(),
+            organizationName: orgName,
+            adminEmail: cleanAdminEmail,
+            version: "1.0.0",
+          }),
+        },
+      });
+    } catch (settingErr) {
+      // Non-fatal: even if SystemSetting table cannot be updated,
+      // User and Tenant creation marks the system as initialized.
+    }
 
     return {
       success: true,

@@ -1,17 +1,13 @@
 -- CreateTable
-CREATE TABLE `Tenant` (
+CREATE TABLE IF NOT EXISTS `Tenant` (
     `id` VARCHAR(191) NOT NULL,
     `name` VARCHAR(191) NOT NULL,
-    `tradingName` VARCHAR(191) NULL,
     `subdomain` VARCHAR(191) NOT NULL,
     `currency` VARCHAR(191) NOT NULL DEFAULT 'AUD',
     `abn` VARCHAR(191) NULL,
     `address` TEXT NULL,
     `phone` VARCHAR(191) NULL,
     `email` VARCHAR(191) NULL,
-    `timeZone` VARCHAR(191) NULL DEFAULT 'Australia/Brisbane',
-    `quotePrefix` VARCHAR(191) NULL DEFAULT 'QU-',
-    `logoUrl` VARCHAR(191) NULL DEFAULT '/logo.png',
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
@@ -21,7 +17,7 @@ CREATE TABLE `Tenant` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `User` (
+CREATE TABLE IF NOT EXISTS `User` (
     `id` VARCHAR(191) NOT NULL,
     `email` VARCHAR(191) NOT NULL,
     `passwordHash` VARCHAR(191) NULL,
@@ -36,7 +32,7 @@ CREATE TABLE `User` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `UserTenant` (
+CREATE TABLE IF NOT EXISTS `UserTenant` (
     `id` VARCHAR(191) NOT NULL,
     `userId` VARCHAR(191) NOT NULL,
     `tenantId` VARCHAR(191) NOT NULL,
@@ -48,7 +44,7 @@ CREATE TABLE `UserTenant` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `WebAuthnCredential` (
+CREATE TABLE IF NOT EXISTS `WebAuthnCredential` (
     `id` VARCHAR(191) NOT NULL,
     `userId` VARCHAR(191) NOT NULL,
     `credentialId` VARCHAR(191) NOT NULL,
@@ -66,7 +62,7 @@ CREATE TABLE `WebAuthnCredential` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `AccountLockout` (
+CREATE TABLE IF NOT EXISTS `AccountLockout` (
     `id` VARCHAR(191) NOT NULL,
     `userId` VARCHAR(191) NOT NULL,
     `failedAttempts` INTEGER NOT NULL DEFAULT 0,
@@ -80,7 +76,7 @@ CREATE TABLE `AccountLockout` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `Account` (
+CREATE TABLE IF NOT EXISTS `Account` (
     `id` VARCHAR(191) NOT NULL,
     `tenantId` VARCHAR(191) NOT NULL,
     `code` VARCHAR(191) NOT NULL,
@@ -96,7 +92,7 @@ CREATE TABLE `Account` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `JournalEntry` (
+CREATE TABLE IF NOT EXISTS `JournalEntry` (
     `id` VARCHAR(191) NOT NULL,
     `tenantId` VARCHAR(191) NOT NULL,
     `entryNumber` VARCHAR(191) NOT NULL,
@@ -116,7 +112,7 @@ CREATE TABLE `JournalEntry` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `JournalLine` (
+CREATE TABLE IF NOT EXISTS `JournalLine` (
     `id` VARCHAR(191) NOT NULL,
     `journalEntryId` VARCHAR(191) NOT NULL,
     `accountId` VARCHAR(191) NOT NULL,
@@ -130,7 +126,7 @@ CREATE TABLE `JournalLine` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `Contact` (
+CREATE TABLE IF NOT EXISTS `Contact` (
     `id` VARCHAR(191) NOT NULL,
     `tenantId` VARCHAR(191) NOT NULL,
     `name` VARCHAR(191) NOT NULL,
@@ -147,7 +143,7 @@ CREATE TABLE `Contact` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `Item` (
+CREATE TABLE IF NOT EXISTS `Item` (
     `id` VARCHAR(191) NOT NULL,
     `tenantId` VARCHAR(191) NOT NULL,
     `code` VARCHAR(191) NOT NULL,
@@ -165,7 +161,7 @@ CREATE TABLE `Item` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `Quote` (
+CREATE TABLE IF NOT EXISTS `Quote` (
     `id` VARCHAR(191) NOT NULL,
     `tenantId` VARCHAR(191) NOT NULL,
     `contactId` VARCHAR(191) NOT NULL,
@@ -196,7 +192,7 @@ CREATE TABLE `Quote` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `QuoteLine` (
+CREATE TABLE IF NOT EXISTS `QuoteLine` (
     `id` VARCHAR(191) NOT NULL,
     `quoteId` VARCHAR(191) NOT NULL,
     `itemCode` VARCHAR(191) NULL,
@@ -213,7 +209,7 @@ CREATE TABLE `QuoteLine` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `QuoteHistory` (
+CREATE TABLE IF NOT EXISTS `QuoteHistory` (
     `id` VARCHAR(191) NOT NULL,
     `quoteId` VARCHAR(191) NOT NULL,
     `timestamp` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -227,7 +223,7 @@ CREATE TABLE `QuoteHistory` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `Invoice` (
+CREATE TABLE IF NOT EXISTS `Invoice` (
     `id` VARCHAR(191) NOT NULL,
     `tenantId` VARCHAR(191) NOT NULL,
     `contactId` VARCHAR(191) NOT NULL,
@@ -251,7 +247,7 @@ CREATE TABLE `Invoice` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `InvoiceLine` (
+CREATE TABLE IF NOT EXISTS `InvoiceLine` (
     `id` VARCHAR(191) NOT NULL,
     `invoiceId` VARCHAR(191) NOT NULL,
     `itemCode` VARCHAR(191) NULL,
@@ -267,7 +263,7 @@ CREATE TABLE `InvoiceLine` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `PurchaseOrder` (
+CREATE TABLE IF NOT EXISTS `PurchaseOrder` (
     `id` VARCHAR(191) NOT NULL,
     `tenantId` VARCHAR(191) NOT NULL,
     `contactId` VARCHAR(191) NOT NULL,
@@ -289,7 +285,7 @@ CREATE TABLE `PurchaseOrder` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `PurchaseOrderLine` (
+CREATE TABLE IF NOT EXISTS `PurchaseOrderLine` (
     `id` VARCHAR(191) NOT NULL,
     `purchaseOrderId` VARCHAR(191) NOT NULL,
     `itemCode` VARCHAR(191) NULL,
@@ -304,7 +300,7 @@ CREATE TABLE `PurchaseOrderLine` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `Bill` (
+CREATE TABLE IF NOT EXISTS `Bill` (
     `id` VARCHAR(191) NOT NULL,
     `tenantId` VARCHAR(191) NOT NULL,
     `contactId` VARCHAR(191) NOT NULL,
@@ -328,7 +324,7 @@ CREATE TABLE `Bill` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `BillLine` (
+CREATE TABLE IF NOT EXISTS `BillLine` (
     `id` VARCHAR(191) NOT NULL,
     `billId` VARCHAR(191) NOT NULL,
     `itemCode` VARCHAR(191) NULL,
@@ -344,7 +340,7 @@ CREATE TABLE `BillLine` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `BankAccount` (
+CREATE TABLE IF NOT EXISTS `BankAccount` (
     `id` VARCHAR(191) NOT NULL,
     `tenantId` VARCHAR(191) NOT NULL,
     `accountName` VARCHAR(191) NOT NULL,
@@ -359,7 +355,7 @@ CREATE TABLE `BankAccount` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `BankStatement` (
+CREATE TABLE IF NOT EXISTS `BankStatement` (
     `id` VARCHAR(191) NOT NULL,
     `bankAccountId` VARCHAR(191) NOT NULL,
     `startDate` DATETIME(3) NOT NULL,
@@ -370,7 +366,7 @@ CREATE TABLE `BankStatement` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `BankStatementLine` (
+CREATE TABLE IF NOT EXISTS `BankStatementLine` (
     `id` VARCHAR(191) NOT NULL,
     `bankStatementId` VARCHAR(191) NOT NULL,
     `date` DATETIME(3) NOT NULL,
@@ -384,7 +380,7 @@ CREATE TABLE `BankStatementLine` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `BankRule` (
+CREATE TABLE IF NOT EXISTS `BankRule` (
     `id` VARCHAR(191) NOT NULL,
     `tenantId` VARCHAR(191) NOT NULL,
     `ruleName` VARCHAR(191) NOT NULL,
@@ -401,7 +397,7 @@ CREATE TABLE `BankRule` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `ReconciliationMatch` (
+CREATE TABLE IF NOT EXISTS `ReconciliationMatch` (
     `id` VARCHAR(191) NOT NULL,
     `bankStatementLineId` VARCHAR(191) NOT NULL,
     `matchStage` ENUM('RULE', 'EXACT', 'HEURISTIC', 'MANUAL') NOT NULL,
@@ -416,7 +412,7 @@ CREATE TABLE `ReconciliationMatch` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `AuditLog` (
+CREATE TABLE IF NOT EXISTS `AuditLog` (
     `id` VARCHAR(191) NOT NULL,
     `tenantId` VARCHAR(191) NOT NULL,
     `userId` VARCHAR(191) NULL,
@@ -544,7 +540,7 @@ ALTER TABLE `AuditLog` ADD CONSTRAINT `AuditLog_tenantId_fkey` FOREIGN KEY (`ten
 ALTER TABLE `AuditLog` ADD CONSTRAINT `AuditLog_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- CreateTable
-CREATE TABLE `SystemSetting` (
+CREATE TABLE IF NOT EXISTS `SystemSetting` (
     `id` VARCHAR(191) NOT NULL,
     `key` VARCHAR(191) NOT NULL,
     `value` TEXT NOT NULL,
