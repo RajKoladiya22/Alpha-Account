@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: fintech_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://fintech_user:fintech_secure_pass_2026@postgres:5432/fintech_db?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=fintech_super_secure_jwt_signing_key_32bytes_long!
+      - NEXT_PUBLIC_MARKETING_DOMAIN=www.yourdomain.com
+      - NEXT_PUBLIC_SHELL_DOMAIN=go.yourdomain.com
+      - NEXT_PUBLIC_AUTH_DOMAIN=login.yourdomain.com
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: fintech_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: fintech_user
+      POSTGRES_PASSWORD: fintech_secure_pass_2026
+      POSTGRES_DB: fintech_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fintech_user -d fintech_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: fintech_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+volumes:
+  pgdata:
+  redisdata:

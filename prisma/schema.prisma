@@ -1,0 +1,520 @@
+// Production-grade Multi-Tenant Financial Accounting Schema
+// Target RDBMS: PostgreSQL (also compatible with MySQL on Hostinger)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// TENANCY & IDENTITY MANAGEMENT
+// ==========================================
+
+model Tenant {
+  id          String   @id @default(uuid())
+  name        String
+  subdomain   String   @unique
+  currency    String   @default("USD")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users             UserTenant[]
+  accounts          Account[]
+  journalEntries    JournalEntry[]
+  contacts          Contact[]
+  items             Item[]
+  quotes            Quote[]
+  invoices          Invoice[]
+  purchaseOrders    PurchaseOrder[]
+  bills             Bill[]
+  bankAccounts      BankAccount[]
+  bankRules         BankRule[]
+  auditLogs         AuditLog[]
+
+  @@index([subdomain])
+}
+
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  passwordHash   String?
+  name           String
+  backupEmail    String    // Invariant 1: Mandatory dual-rail fallback email
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenants        UserTenant[]
+  passkeys       WebAuthnCredential[]
+  lockoutState   AccountLockout?
+  auditLogs      AuditLog[]
+
+  @@index([email])
+}
+
+model UserTenant {
+  id        String   @id @default(uuid())
+  userId    String
+  tenantId  String
+  role      String   @default("STANDARD") // OWNER, ADVISER, STANDARD, READONLY
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+}
+
+// Invariant 1: WebAuthn Passkeys with Hardware Credential binding
+model WebAuthnCredential {
+  id           String   @id @default(uuid())
+  userId       String
+  credentialId String   @unique
+  publicKey    Bytes
+  counter      BigInt   @default(0)
+  deviceType   String   // e.g. "platform", "cross-platform"
+  backedUp     Boolean  @default(false)
+  transports   String[] // "usb", "ble", "nfc", "internal"
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime?
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Invariant 1: Strict 15-Minute Sliding-Window Brute-Force Lockout
+model AccountLockout {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  failedAttempts  Int       @default(0)
+  lockedUntil     DateTime?
+  lastFailedAt    DateTime?
+  lastResetReqAt  DateTime?
+  updatedAt       DateTime  @updatedAt
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// CHART OF ACCOUNTS & DOUBLE-ENTRY LEDGER
+// ==========================================
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+model Account {
+  id          String      @id @default(uuid())
+  tenantId    String
+  code        String      // e.g. "200" (Sales), "610" (Cost of Goods Sold), "800" (Bank)
+  name        String
+  type        AccountType
+  currency    String      @default("USD")
+  isSystem    Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  journalLines JournalLine[]
+  bankAccount BankAccount?
+
+  @@unique([tenantId, code])
+  @@index([tenantId, type])
+}
+
+// Invariant 2: Immutable Journal Entries (sum(debits) == sum(credits))
+model JournalEntry {
+  id                 String       @id @default(uuid())
+  tenantId           String
+  entryNumber        String
+  date               DateTime
+  narration          String
+  sourceDocumentType String?      // "INVOICE", "BILL", "PAYMENT", "BANK_RECON"
+  sourceDocumentId   String?
+  isReversed         Boolean      @default(false)
+  reversingJournalId String?      @unique
+  createdAt          DateTime     @default(now())
+
+  tenant             Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lines              JournalLine[]
+  reversingJournal   JournalEntry? @relation("JournalReversal", fields: [reversingJournalId], references: [id])
+  reversedBy         JournalEntry? @relation("JournalReversal")
+
+  @@unique([tenantId, entryNumber])
+  @@index([tenantId, date])
+  @@index([sourceDocumentType, sourceDocumentId])
+}
+
+model JournalLine {
+  id             String       @id @default(uuid())
+  journalEntryId String
+  accountId      String
+  description    String?
+  debit          Decimal      @default(0) @db.Decimal(18, 4)
+  credit         Decimal      @default(0) @db.Decimal(18, 4)
+
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account        Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([journalEntryId])
+  @@index([accountId])
+}
+
+// ==========================================
+// MASTER ENTITIES: CONTACTS & CATALOG
+// ==========================================
+
+model Contact {
+  id          String    @id @default(uuid())
+  tenantId    String
+  name        String
+  email       String?
+  phone       String?
+  isCustomer  Boolean   @default(true)
+  isSupplier  Boolean   @default(false)
+  taxNumber   String?
+  createdAt   DateTime  @default(now())
+
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  quotes      Quote[]
+  invoices    Invoice[]
+  purchaseOrders PurchaseOrder[]
+  bills       Bill[]
+
+  @@index([tenantId, name])
+}
+
+model Item {
+  id                String   @id @default(uuid())
+  tenantId          String
+  code              String
+  name              String
+  description       String?
+  salesUnitPrice    Decimal  @db.Decimal(18, 4)
+  purchaseUnitPrice Decimal  @db.Decimal(18, 4)
+  taxRate           Decimal  @default(0) @db.Decimal(5, 2)
+  salesAccountId    String?
+  purchaseAccountId String?
+  createdAt         DateTime @default(now())
+
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+}
+
+// ==========================================
+// Invariant 3: DOCUMENT MUTATION LIFECYCLE
+// ==========================================
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  DECLINED
+  CONVERTED_TO_INVOICE
+}
+
+model Quote {
+  id                 String       @id @default(uuid())
+  tenantId           String
+  contactId          String
+  quoteNumber        String
+  date               DateTime
+  expiryDate         DateTime
+  status             QuoteStatus  @default(DRAFT)
+  subtotal           Decimal      @db.Decimal(18, 4)
+  taxTotal           Decimal      @db.Decimal(18, 4)
+  totalAmount        Decimal      @db.Decimal(18, 4)
+  convertedToInvoiceId String?    @unique
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  tenant             Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contact            Contact      @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  lines              QuoteLine[]
+  convertedInvoice   Invoice?     @relation("QuoteToInvoice", fields: [convertedToInvoiceId], references: [id])
+
+  @@unique([tenantId, quoteNumber])
+  @@index([tenantId, status])
+}
+
+model QuoteLine {
+  id          String   @id @default(uuid())
+  quoteId     String
+  itemCode    String?
+  description String
+  quantity    Decimal  @db.Decimal(18, 4)
+  unitPrice   Decimal  @db.Decimal(18, 4)
+  discount    Decimal  @default(0) @db.Decimal(5, 2)
+  taxRate     Decimal  @default(0) @db.Decimal(5, 2)
+  lineAmount  Decimal  @db.Decimal(18, 4)
+
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+}
+
+enum InvoiceStatus {
+  DRAFT
+  AUTHORIZED
+  PARTIALLY_PAID
+  PAID
+  VOIDED
+}
+
+model Invoice {
+  id             String        @id @default(uuid())
+  tenantId       String
+  contactId      String
+  invoiceNumber  String
+  date           DateTime
+  dueDate        DateTime
+  status         InvoiceStatus @default(DRAFT)
+  subtotal       Decimal       @db.Decimal(18, 4)
+  taxTotal       Decimal       @db.Decimal(18, 4)
+  totalAmount    Decimal       @db.Decimal(18, 4)
+  amountPaid     Decimal       @default(0) @db.Decimal(18, 4)
+  amountDue      Decimal       @db.Decimal(18, 4)
+  
+  // Referential Lineage preserving origin quote
+  sourceQuoteId  String?       @unique
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contact        Contact       @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  lines          InvoiceLine[]
+  sourceQuote    Quote?        @relation("QuoteToInvoice")
+  reconciliations ReconciliationMatch[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId, status])
+}
+
+model InvoiceLine {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  itemCode    String?
+  description String
+  quantity    Decimal  @db.Decimal(18, 4)
+  unitPrice   Decimal  @db.Decimal(18, 4)
+  discount    Decimal  @default(0) @db.Decimal(5, 2)
+  taxRate     Decimal  @default(0) @db.Decimal(5, 2)
+  lineAmount  Decimal  @db.Decimal(18, 4)
+  accountId   String
+
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  APPROVED
+  BILLED
+}
+
+model PurchaseOrder {
+  id                 String              @id @default(uuid())
+  tenantId           String
+  contactId          String
+  poNumber           String
+  date               DateTime
+  deliveryDate       DateTime?
+  status             PurchaseOrderStatus @default(DRAFT)
+  subtotal           Decimal             @db.Decimal(18, 4)
+  taxTotal           Decimal             @db.Decimal(18, 4)
+  totalAmount        Decimal             @db.Decimal(18, 4)
+  convertedToBillId  String?             @unique
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contact            Contact             @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  lines              PurchaseOrderLine[]
+  convertedBill      Bill?               @relation("POToBill", fields: [convertedToBillId], references: [id])
+
+  @@unique([tenantId, poNumber])
+  @@index([tenantId, status])
+}
+
+model PurchaseOrderLine {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  itemCode        String?
+  description     String
+  quantity        Decimal       @db.Decimal(18, 4)
+  unitPrice       Decimal       @db.Decimal(18, 4)
+  discount        Decimal       @default(0) @db.Decimal(5, 2)
+  taxRate         Decimal       @default(0) @db.Decimal(5, 2)
+  lineAmount      Decimal       @db.Decimal(18, 4)
+
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+}
+
+enum BillStatus {
+  DRAFT
+  AUTHORIZED
+  PARTIALLY_PAID
+  PAID
+  VOIDED
+}
+
+model Bill {
+  id                  String       @id @default(uuid())
+  tenantId            String
+  contactId           String
+  billNumber          String
+  date                DateTime
+  dueDate             DateTime
+  status              BillStatus   @default(DRAFT)
+  subtotal            Decimal      @db.Decimal(18, 4)
+  taxTotal            Decimal      @db.Decimal(18, 4)
+  totalAmount         Decimal      @db.Decimal(18, 4)
+  amountPaid          Decimal      @default(0) @db.Decimal(18, 4)
+  amountDue           Decimal      @db.Decimal(18, 4)
+
+  // Referential Lineage preserving origin Purchase Order
+  sourcePurchaseOrderId String?    @unique
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  tenant              Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contact             Contact      @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  lines               BillLine[]
+  sourcePurchaseOrder PurchaseOrder? @relation("POToBill")
+  reconciliations     ReconciliationMatch[]
+
+  @@unique([tenantId, billNumber])
+  @@index([tenantId, status])
+}
+
+model BillLine {
+  id          String   @id @default(uuid())
+  billId      String
+  itemCode    String?
+  description String
+  quantity    Decimal  @db.Decimal(18, 4)
+  unitPrice   Decimal  @db.Decimal(18, 4)
+  discount    Decimal  @default(0) @db.Decimal(5, 2)
+  taxRate     Decimal  @default(0) @db.Decimal(5, 2)
+  lineAmount  Decimal  @db.Decimal(18, 4)
+  accountId   String
+
+  bill        Bill     @relation(fields: [billId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// Invariant 4: BANK RECONCILIATION MATCHING
+// ==========================================
+
+model BankAccount {
+  id            String          @id @default(uuid())
+  tenantId      String
+  accountName   String
+  accountNumber String
+  bankName      String
+  currency      String          @default("USD")
+  glAccountId   String          @unique
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  glAccount     Account         @relation(fields: [glAccountId], references: [id], onDelete: Restrict)
+  statements    BankStatement[]
+
+  @@unique([tenantId, accountNumber])
+}
+
+model BankStatement {
+  id            String              @id @default(uuid())
+  bankAccountId String
+  startDate     DateTime
+  endDate       DateTime
+  importedAt    DateTime            @default(now())
+
+  bankAccount   BankAccount         @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  lines         BankStatementLine[]
+}
+
+enum StatementLineStatus {
+  UNRECONCILED
+  RECONCILED
+}
+
+model BankStatementLine {
+  id              String              @id @default(uuid())
+  bankStatementId String
+  date            DateTime
+  narration       String              // Payee, reference, or bank description
+  amount          Decimal             @db.Decimal(18, 4) // Positive = Money In, Negative = Money Out
+  balanceAfter    Decimal?            @db.Decimal(18, 4)
+  status          StatementLineStatus @default(UNRECONCILED)
+
+  bankStatement   BankStatement       @relation(fields: [bankStatementId], references: [id], onDelete: Cascade)
+  reconciliation  ReconciliationMatch?
+
+  @@index([bankStatementId, status])
+}
+
+model BankRule {
+  id          String   @id @default(uuid())
+  tenantId    String
+  ruleName    String
+  priority    Int      @default(0)
+  targetType  String   // "SPEND" or "RECEIVE"
+  conditions  Json     // Array of { field: "narration"|"amount", operator: "CONTAINS"|"EQUALS", value: string }
+  targetAccountId String
+  targetContactId String?
+  taxRate     Decimal  @default(0) @db.Decimal(5, 2)
+  createdAt   DateTime @default(now())
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, priority])
+}
+
+enum MatchStage {
+  RULE        // Step 1: User-defined Conditional Bank Rules
+  EXACT       // Step 2: 1:1 correlation on sign, amount, reference
+  HEURISTIC   // Step 3: Weighted multi-factor proximity score
+  MANUAL      // Step 4: Fallback
+}
+
+model ReconciliationMatch {
+  id                  String             @id @default(uuid())
+  bankStatementLineId String             @unique
+  matchStage          MatchStage
+  confidenceScore     Decimal            @db.Decimal(5, 2) // 0.00 to 1.00
+  matchedInvoiceId    String?
+  matchedBillId       String?
+  matchedJournalId    String?
+  reconciledAt        DateTime           @default(now())
+
+  statementLine       BankStatementLine  @relation(fields: [bankStatementLineId], references: [id], onDelete: Cascade)
+  matchedInvoice      Invoice?           @relation(fields: [matchedInvoiceId], references: [id])
+  matchedBill         Bill?              @relation(fields: [matchedBillId], references: [id])
+}
+
+// ==========================================
+// Invariant 5: AUDIT LOGS FOR JAX AI TOOL CALLS
+// ==========================================
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  tenantId    String
+  userId      String?
+  action      String   // e.g. "JAX_CREATE_INVOICE", "USER_LOCKOUT", "POST_JOURNAL"
+  entityType  String   // "INVOICE", "JOURNAL", "AUTH"
+  entityId    String?
+  payload     Json
+  ipAddress   String?
+  timestamp   DateTime @default(now())
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, action])
+  @@index([tenantId, timestamp])
+}
