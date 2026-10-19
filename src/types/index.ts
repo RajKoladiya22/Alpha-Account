@@ -66,6 +66,31 @@ export const BillStatus = {
 } as const;
 export type BillStatus = (typeof BillStatus)[keyof typeof BillStatus];
 
+export const TaxTreatment = {
+  EXCLUSIVE: "EXCLUSIVE",
+  INCLUSIVE: "INCLUSIVE",
+  NO_TAX: "NO_TAX",
+} as const;
+export type TaxTreatment = (typeof TaxTreatment)[keyof typeof TaxTreatment];
+
+export interface QuoteAttachment {
+  id: string;
+  name: string;
+  size: number;
+  mimeType: string;
+  uploadedAt: Date;
+  url: string;
+}
+
+export interface QuoteHistoryItem {
+  id: string;
+  timestamp: Date;
+  user: string;
+  action: string;
+  detail: string;
+  isNote?: boolean;
+}
+
 export interface DocumentLineItem {
   id: string;
   itemCode?: string;
@@ -83,14 +108,23 @@ export interface QuoteEntity {
   tenantId: string;
   contactId: string;
   quoteNumber: string;
+  reference?: string;
+  title?: string;
+  summary?: string;
   date: Date;
   expiryDate: Date;
+  currency?: string;
+  projectId?: string;
+  taxTreatment?: TaxTreatment;
   status: QuoteStatus;
+  terms?: string;
   subtotal: number;
   taxTotal: number;
   totalAmount: number;
   convertedToInvoiceId?: string;
   lines: DocumentLineItem[];
+  attachments?: QuoteAttachment[];
+  history?: QuoteHistoryItem[];
 }
 
 export interface InvoiceEntity {
@@ -202,3 +236,77 @@ export interface JaxAuditRecord {
   result: Record<string, any>;
   timestamp: Date;
 }
+
+// Contacts & Customers
+export interface ContactAddress {
+  street?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+}
+
+export interface PrimaryPerson {
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+export interface ContactEntity {
+  id: string;
+  tenantId: string;
+  name: string;
+  accountNumber?: string;
+  primaryPerson?: PrimaryPerson;
+  email?: string;
+  phone?: string;
+  address?: ContactAddress;
+  postalAddress?: ContactAddress;
+  isCustomer: boolean;
+  isSupplier: boolean;
+  taxNumber?: string;
+  youOwe: number;
+  theyOwe: number;
+  isOverdue?: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Tenancy & RBAC
+export const UserRole = {
+  OWNER: "OWNER",
+  ADVISER: "ADVISER",
+  STANDARD: "STANDARD",
+  READONLY: "READONLY",
+} as const;
+export type UserRole = (typeof UserRole)[keyof typeof UserRole];
+
+export interface OrganizationEntity {
+  id: string;
+  name: string;
+  subdomain: string;
+  currency: string;
+  legalTradingName?: string;
+  registrationNumber?: string;
+  organizationType?: string;
+  createdAt: Date;
+}
+
+export interface TenantSettings {
+  tenantId: string;
+  financialYearEndMonth: number; // e.g. 6 for June 30
+  taxBasis: "ACCRUAL" | "CASH";
+  defaultQuoteExpiryDays: number; // default 30
+  quoteNumberPrefix: string; // default "QU-"
+  quoteDefaultTerms?: string;
+  currency: string;
+}
+
+// Client Portal Signed Token
+export interface PortalTokenPayload {
+  tenantId: string;
+  quoteId: string;
+  issuedAt: number;
+  expiresAt: number;
+}
+
